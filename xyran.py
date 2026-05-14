@@ -58,9 +58,12 @@ SYSTEM:
 - Kill app: pkill appname
 - Shutdown: systemctl poweroff
 - Restart: systemctl reboot
-- Volume up: wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
+- Volume up: wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
 - Volume down: wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
-- Mute: wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
+- Mute: wpctl set-mute @DEFAULT_AUDIO_SINK@ 1
+- Unmute: wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
+- Volume set to full: wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%
+- Volume set to X%: wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ X%
 - Screenshot: scrot ~/Desktop/screenshot_$(date +%s).png
 
 PACKAGE MANAGEMENT:
