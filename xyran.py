@@ -1,7 +1,16 @@
 import os
 
 from groq import Groq, RateLimitError
-from config import GROQ_API_KEY, MODEL, AI_NAME, USER_NAME, NEWS_API_KEY
+from config import (
+    AI_NAME,
+    AI_PROVIDER_MODE,
+    GEMINI_API_KEY,
+    GEMINI_MODEL,
+    GROQ_API_KEY,
+    MODEL,
+    NEWS_API_KEY,
+    USER_NAME,
+)
 from vision import take_screenshot
 from xyran_command_utils import command_failed, run_command
 from xyran_input_utils import (
@@ -22,7 +31,7 @@ try:
 except Exception:
     pyjokes = None
 
-client = Groq(api_key=GROQ_API_KEY)
+client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 runtime_state = RuntimeState()
 FALLBACK_API_KEY = os.environ.get("FALLBACK_API_KEY", "").strip()
 FALLBACK_MODEL = os.environ.get("FALLBACK_MODEL", "").strip()
@@ -43,7 +52,11 @@ SYSTEM_PROMPT = build_system_prompt(AI_NAME, USER_NAME)
 VISION_SYSTEM_PROMPT = build_vision_system_prompt(AI_NAME)
 ai = XyranAI(
     client=client,
+    groq_api_key=GROQ_API_KEY,
     model=MODEL,
+    gemini_api_key=GEMINI_API_KEY,
+    gemini_model=GEMINI_MODEL,
+    provider_mode=AI_PROVIDER_MODE,
     system_prompt=SYSTEM_PROMPT,
     vision_system_prompt=VISION_SYSTEM_PROMPT,
     fallback_api_key=FALLBACK_API_KEY,
@@ -55,10 +68,7 @@ news_manager = NewsManager(
     news_api_key=NEWS_API_KEY,
     news_api_url=NEWS_API_URL,
     news_state_path=NEWS_STATE_PATH,
-    model=MODEL,
-    client=client,
-    call_fallback_chat=ai.call_fallback_chat,
-    has_fallback_provider=ai.has_fallback_provider,
+    generate_text_reply=ai.generate_text_reply,
 )
 
 
@@ -77,11 +87,12 @@ def main():
             user_input = read_user_input(f"[{USER_NAME}] ").strip()
             if not user_input:
                 continue
+            runtime_state.last_user_input = user_input
             if user_input.lower() in ("exit", "quit", "band karo"):
                 print("[Xyran] Theek hai. Phir milenge.")
                 break
 
-            if handle_direct_action(user_input, runtime_state, news_manager, pyjokes, run_command, command_failed):
+            if handle_direct_action(user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai):
                 runtime_state.last_input_used_vision = False
                 continue
 
@@ -108,7 +119,7 @@ def main():
                 if runtime_state.vision_followup_turns_left > 0:
                     runtime_state.vision_followup_turns_left -= 1
 
-            process_response(reply, run_command, command_failed, ai.summarize_output, clean_json)
+            process_response(reply, run_command, command_failed, ai.summarize_output, clean_json, runtime_state)
 
         except KeyboardInterrupt:
             print("\n[Xyran] Band ho raha hoon.")

@@ -1,4 +1,5 @@
 import os
+import re
 import time
 from datetime import datetime
 
@@ -16,12 +17,15 @@ from xyran_app_utils import (
 )
 from xyran_input_utils import (
     extract_explicit_website_target,
+    extract_code_topic_request,
+    extract_generated_note_request,
     extract_python_code_request,
     extract_requested_app_name,
     extract_text_to_write,
     extract_web_search_query,
     get_available_text_editor,
     get_editor_open_command,
+    generate_code_from_topic,
     get_local_joke,
     get_local_smalltalk_reply,
     is_acknowledgement,
@@ -73,7 +77,42 @@ def prepare_python_file(runtime_state, initial_code=None):
     return file_path
 
 
-def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module, run_command, command_failed):
+def _normalize_tokens(text):
+    return {
+        token
+        for token in re.findall(r"[a-zA-Z]+", (text or "").lower())
+        if len(token) > 2
+    }
+
+
+def should_write_last_answer(user_input, extracted_text, runtime_state):
+    if not extracted_text or not runtime_state.last_assistant_text or not runtime_state.last_user_input:
+        return False
+
+    lowered = user_input.lower()
+    if "code" in lowered:
+        return False
+    if "write " in lowered:
+        return False
+    if len(runtime_state.last_assistant_text.strip()) < 80:
+        return False
+
+    explicit_note_phrases = [
+        "notepad me likh", "notepad me likho", "notepad me likhna",
+        "notpad me likh", "notpad me likho", "notpad me likhna",
+        "notrpad me likh", "notrpad me likho", "notrpad me likhna",
+        "editor me likh", "editor me likho", "editor me likhna",
+    ]
+    if not any(phrase in lowered for phrase in explicit_note_phrases):
+        return False
+
+    current_tokens = _normalize_tokens(extracted_text)
+    previous_user_tokens = _normalize_tokens(runtime_state.last_user_input)
+    overlap = current_tokens & previous_user_tokens
+    return len(overlap) >= 2
+
+
+def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module, run_command, command_failed, ai=None):
     lowered = user_input.lower().strip()
     did_something = False
     screenshot_requested = is_screenshot_request(lowered)
@@ -247,10 +286,43 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
             print("[Xyran] Koi supported text editor nahi mila. `gnome-text-editor` ya `gedit` install hona chahiye.")
             return True
 
-        text_to_write = extract_text_to_write(user_input)
+        code_snippet = generate_code_from_topic(user_input)
+        generated_note_request = None if code_snippet else extract_generated_note_request(user_input)
+        text_to_write = code_snippet or extract_text_to_write(user_input)
+        if should_write_last_answer(user_input, text_to_write, runtime_state):
+            text_to_write = runtime_state.last_assistant_text
+        elif generated_note_request and ai:
+            try:
+                content_type = generated_note_request["type"]
+                topic = generated_note_request["topic"]
+                generated_text = ai.generate_text_reply(
+                    [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You write concise, clean study/help content in simple English. "
+                                "Return only the requested content as plain text. No JSON, no markdown fences."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Write a {content_type} on {topic}. Keep it clear and natural.",
+                        },
+                    ],
+                    user_input=f"write a {content_type} on {topic}",
+                    temperature=0.4,
+                    max_tokens=500,
+                )
+                text_to_write = generated_text.strip()
+            except Exception:
+                pass
         file_path = prepare_editor_file(runtime_state, text_to_write)
 
-        if text_to_write:
+        if code_snippet:
+            print(f"[Xyran] {editor} khol raha hoon aur code file mein likh diya hai")
+        elif generated_note_request and text_to_write and text_to_write != extract_text_to_write(user_input):
+            print(f"[Xyran] {editor} khol raha hoon aur generated content file mein likh diya hai")
+        elif text_to_write:
             print(f"[Xyran] {editor} khol raha hoon aur file mein text likh diya hai")
         else:
             print(f"[Xyran] {editor} khol raha hoon")
@@ -263,7 +335,13 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
                 print("[Xyran] File ban gayi, lekin editor khul nahi paya.")
                 return True
 
-        if text_to_write:
+        if code_snippet:
+            topic = extract_code_topic_request(user_input) or "requested"
+            print(f"[Xyran] `{topic}` ka code file mein likh diya aur editor khol diya: {file_path}")
+        elif generated_note_request and text_to_write and text_to_write != extract_text_to_write(user_input):
+            topic = generated_note_request["topic"]
+            print(f"[Xyran] `{topic}` ke liye generated content file mein likh diya aur editor khol diya: {file_path}")
+        elif text_to_write:
             print(f"[Xyran] `{text_to_write}` file mein likh diya aur editor khol diya: {file_path}")
         else:
             print(f"[Xyran] Editor khol diya: {file_path}")

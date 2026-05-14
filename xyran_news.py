@@ -3,8 +3,6 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from groq import RateLimitError
-
 from xyran_input_utils import (
     extract_news_selection_index,
     get_news_query_params,
@@ -20,18 +18,12 @@ class NewsManager:
         news_api_key,
         news_api_url,
         news_state_path,
-        model,
-        client,
-        call_fallback_chat,
-        has_fallback_provider,
+        generate_text_reply,
     ):
         self.news_api_key = news_api_key
         self.news_api_url = news_api_url
         self.news_state_path = news_state_path
-        self.model = model
-        self.client = client
-        self.call_fallback_chat = call_fallback_chat
-        self.has_fallback_provider = has_fallback_provider
+        self.generate_text_reply = generate_text_reply
         self.last_news_titles = []
         self.last_news_query_signature = None
         self.last_news_page = 1
@@ -102,22 +94,13 @@ class NewsManager:
         ]
 
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
+            reply = self.generate_text_reply(
                 messages=messages,
+                user_input=user_input,
                 temperature=0.2,
-                max_tokens=180
+                max_tokens=180,
             )
-            reply = response.choices[0].message.content.strip()
             return f"{index + 1}. {title} - {source}\n{reply}"
-        except RateLimitError:
-            if self.has_fallback_provider():
-                try:
-                    reply = self.call_fallback_chat(messages, self.model, temperature=0.2, max_tokens=180)
-                    return f"{index + 1}. {title} - {source}\n{reply}"
-                except Exception:
-                    pass
-            return "Abhi summary API limit hit ho gayi hai. Thodi der baad phir try karo."
         except Exception as exc:
             return f"Summary nahi bana paya: {exc}"
 

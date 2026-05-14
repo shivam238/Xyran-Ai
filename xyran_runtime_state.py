@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 class RuntimeState:
     last_input_used_vision: bool = False
     vision_followup_turns_left: int = 0
+    last_user_input: str | None = None
+    last_assistant_text: str | None = None
     last_screenshot_path: str | None = None
     last_editor_file_path: str | None = None
     last_created_code_file: str | None = None

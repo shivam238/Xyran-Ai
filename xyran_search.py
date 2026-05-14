@@ -52,6 +52,7 @@ SCREENSHOT_TRAILING_PATTERNS = [
 
 OPEN_TRAILING_PATTERNS = [
     r"\s+(?:and|aur|phir)\s+(?:open|show|dikha|dikhao|khol)(?:\s+.*)?$",
+    r"\s+(?:and|aur|or|phir)\s+.+?\s+(?:open|show|dikha|dikhao|khol|open kr|open karo|kro|karo)(?:\s+.*)?$",
 ]
 
 SEARCH_TRAILING_PATTERNS = [

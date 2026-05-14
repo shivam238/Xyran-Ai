@@ -28,8 +28,11 @@ def load_dotenv(dotenv_path=None):
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY", "put-your-groq-key-in-.env")
-MODEL = os.getenv("MODEL", "llama-3.3-70b-versatile")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "").strip()
+MODEL = os.getenv("MODEL", "llama-3.3-70b-versatile").strip()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash").strip()
+AI_PROVIDER_MODE = os.getenv("AI_PROVIDER_MODE", "smart").strip().lower()
 AI_NAME = os.getenv("AI_NAME", "Xyran")
 USER_NAME = os.getenv("USER_NAME", "darkeeidea")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")

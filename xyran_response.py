@@ -1,7 +1,7 @@
 import json
 
 
-def process_response(reply, run_command, command_failed, summarize_output, clean_json):
+def process_response(reply, run_command, command_failed, summarize_output, clean_json, runtime_state):
     reply = clean_json(reply)
     try:
         data = json.loads(reply)
@@ -54,7 +54,9 @@ def process_response(reply, run_command, command_failed, summarize_output, clean
 
         elif action == "answer":
             message = data.get("message", "")
+            runtime_state.last_assistant_text = message
             print(f"\n[Xyran] {message}")
 
     except json.JSONDecodeError:
+        runtime_state.last_assistant_text = reply
         print(f"\n[Xyran] {reply}")

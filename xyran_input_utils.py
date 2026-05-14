@@ -244,9 +244,12 @@ def wants_to_show_screenshot(user_input):
 
 def is_text_editor_request(user_input):
     lowered = user_input.lower()
-    editor_words = ["text editor", "editor", "gedit", "gnome-text-editor", "notepad"]
+    editor_words = [
+        "text editor", "editor", "gedit", "gnome-text-editor",
+        "notepad", "notpad", "notrpad", "notepad",
+    ]
     open_words = ["open", "khol", "khol do", "kholde", "open kr", "open karo"]
-    write_words = ["likh", "write", "type"]
+    write_words = ["likh", "likho", "likhna", "write", "type"]
     return any(word in lowered for word in editor_words) and (
         any(word in lowered for word in open_words) or any(word in lowered for word in write_words)
     )
@@ -261,16 +264,22 @@ def is_python_file_request(user_input):
 
 def extract_text_to_write(user_input):
     patterns = [
+        r"write\s+(?:the\s+)?(?:word|text|line)\s+(.+?)\s+on\s+(?:notepad|notpad|notrpad|text editor|editor)$",
+        r"type\s+(?:the\s+)?(?:word|text|line)\s+(.+?)\s+on\s+(?:notepad|notpad|notrpad|text editor|editor)$",
+        r"(.+?)\s+likhna\s+(?:notepad|notpad|notrpad|notepad|text editor|editor)(?:\s+(?:me|mein))?(?:\s+(?:ke|and|aur|or)\s+.+)?$",
         r"likh\s+(?!ke\b|and\b|aur\b)(.+)$",
         r"likho\s+(?!ke\b|and\b|aur\b)(.+)$",
+        r"likhna\s+(?!ke\b|and\b|aur\b)(.+)$",
         r"write\s+(?!and\b)(.+)$",
         r"type\s+(?!and\b)(.+)$",
         r"(.+?)\s+likh(?:\s+(?:ke|and|aur)\s+.+)?$",
         r"(.+?)\s+likho(?:\s+(?:ke|and|aur)\s+.+)?$",
+        r"(.+?)\s+likhna(?:\s+(?:ke|and|aur|or)\s+.+)?$",
         r"(.+?)\s+write(?:\s+(?:ke|and|aur)\s+.+)?$",
         r"(.+?)\s+type(?:\s+(?:ke|and|aur)\s+.+)?$",
         r"(.+?)\s+likh$",
         r"(.+?)\s+likho$",
+        r"(.+?)\s+likhna$",
         r"(.+?)\s+write$",
         r"(.+?)\s+type$",
     ]
@@ -280,7 +289,7 @@ def extract_text_to_write(user_input):
             text = match.group(1).strip().strip("\"'")
             if text:
                 cleanup_patterns = [
-                    r"^(text editor|editor|gedit|gnome-text-editor|notepad)\s+",
+                    r"^(text editor|editor|gedit|gnome-text-editor|notepad|notpad|notrpad|notepad)\s+",
                     r"^(open karo|open kr|open|khol do|kholde|kholo|khol ke|kholke|khol)\s+",
                     r"^ke\s+",
                     r"^do\s+",
@@ -296,6 +305,24 @@ def extract_text_to_write(user_input):
                             text = updated
                             changed = True
                 text = strip_trailing_action_clauses(text, strip_search=False, strip_write=False)
+                text = re.sub(
+                    r"\s+(?:notepad|notpad|notrpad|notepad|text editor|editor)\s+(?:me|mein)$",
+                    "",
+                    text,
+                    flags=re.IGNORECASE,
+                ).strip()
+                text = re.sub(
+                    r"^(?:the\s+)?(?:word|text|line)\s+",
+                    "",
+                    text,
+                    flags=re.IGNORECASE,
+                ).strip()
+                text = re.sub(
+                    r"\s+on\s+(?:notepad|notpad|notrpad|text editor|editor)$",
+                    "",
+                    text,
+                    flags=re.IGNORECASE,
+                ).strip()
             if text:
                 return text
     return None
@@ -314,6 +341,167 @@ def extract_python_code_request(user_input):
         return 'print("hello")'
     if "hello world print" in lowered or "print hello world" in lowered:
         return 'print("hello world")'
+    return None
+
+
+def extract_code_topic_request(user_input):
+    lowered = user_input.lower().strip()
+    match = re.search(r"(.+?)\s+(?:kaa|ka|ki|kaa)\s+code\b", lowered)
+    if match:
+        topic = match.group(1).strip()
+        topic = re.sub(
+            r"^(?:open|open karo|open kr|khol|khol do|kholo|notepad|editor|text editor)\s+",
+            "",
+            topic,
+            flags=re.IGNORECASE,
+        ).strip()
+        topic = strip_trailing_action_clauses(
+            topic,
+            strip_search=False,
+            strip_write=False,
+        )
+        topic = re.sub(
+            r"\b(?:implementation|implimentation|implimentaation|implementaion|implement)\b",
+            "",
+            topic,
+            flags=re.IGNORECASE,
+        ).strip()
+        if topic:
+            return " ".join(topic.split())
+    return None
+
+
+def extract_generated_note_request(user_input):
+    lowered = user_input.lower().strip()
+    patterns = [
+        (r"(?:can u|can you|please)?\s*write\s+a\s+paragraph\s+on\s+(.+?)(?:\s+on\s+(?:notepad|notpad|notrpad|text editor|editor))?$", "paragraph"),
+        (r"(.+?)\s+par\s+paragraph\s+likh(?:o|na)?(?:\s+(?:notepad|notpad|notrpad|text editor|editor)(?:\s+(?:me|mein))?)?$", "paragraph"),
+        (r"(?:can u|can you|please)?\s*write\s+an?\s+essay\s+on\s+(.+?)(?:\s+on\s+(?:notepad|notpad|notrpad|text editor|editor))?$", "essay"),
+        (r"(?:can u|can you|please)?\s*write\s+notes?\s+on\s+(.+?)(?:\s+on\s+(?:notepad|notpad|notrpad|text editor|editor))?$", "notes"),
+        (r"(.+?)\s+ke\s+notes?\s+likh(?:o|na)?(?:\s+(?:notepad|notpad|notrpad|text editor|editor)(?:\s+(?:me|mein))?)?$", "notes"),
+    ]
+    for pattern, content_type in patterns:
+        match = re.search(pattern, lowered, re.IGNORECASE)
+        if not match:
+            continue
+        topic = match.group(1).strip().strip("\"'")
+        topic = strip_trailing_action_clauses(topic, strip_search=False, strip_write=False)
+        topic = re.sub(
+            r"\s+(?:on|in)\s+(?:notepad|notpad|notrpad|text editor|editor)$",
+            "",
+            topic,
+            flags=re.IGNORECASE,
+        ).strip()
+        if topic:
+            return {"type": content_type, "topic": " ".join(topic.split())}
+    return None
+
+
+def generate_code_from_topic(user_input):
+    topic = extract_code_topic_request(user_input)
+    if not topic:
+        return None
+
+    if "binary search tree" in topic or topic == "bst":
+        return """class Node:
+    def __init__(self, value):
+        self.value = value
+        self.left = None
+        self.right = None
+
+
+class BinarySearchTree:
+    def __init__(self):
+        self.root = None
+
+    def insert(self, value):
+        if self.root is None:
+            self.root = Node(value)
+            return
+        self._insert_recursive(self.root, value)
+
+    def _insert_recursive(self, current, value):
+        if value < current.value:
+            if current.left is None:
+                current.left = Node(value)
+            else:
+                self._insert_recursive(current.left, value)
+        else:
+            if current.right is None:
+                current.right = Node(value)
+            else:
+                self._insert_recursive(current.right, value)
+
+    def inorder(self):
+        result = []
+        self._inorder_recursive(self.root, result)
+        return result
+
+    def _inorder_recursive(self, current, result):
+        if current is None:
+            return
+        self._inorder_recursive(current.left, result)
+        result.append(current.value)
+        self._inorder_recursive(current.right, result)
+
+    def search(self, value):
+        return self._search_recursive(self.root, value)
+
+    def _search_recursive(self, current, value):
+        if current is None:
+            return False
+        if current.value == value:
+            return True
+        if value < current.value:
+            return self._search_recursive(current.left, value)
+        return self._search_recursive(current.right, value)
+
+
+bst = BinarySearchTree()
+for item in [50, 30, 70, 20, 40, 60, 80]:
+    bst.insert(item)
+
+print("Inorder traversal:", bst.inorder())
+print("Search 40:", bst.search(40))
+print("Search 90:", bst.search(90))
+"""
+
+    if "stack" in topic:
+        return """class Stack:
+    def __init__(self):
+        self.items = []
+
+    def push(self, value):
+        self.items.append(value)
+
+    def pop(self):
+        if self.is_empty():
+            return None
+        return self.items.pop()
+
+    def peek(self):
+        if self.is_empty():
+            return None
+        return self.items[-1]
+
+    def is_empty(self):
+        return len(self.items) == 0
+
+    def size(self):
+        return len(self.items)
+
+
+stack = Stack()
+stack.push(10)
+stack.push(20)
+stack.push(30)
+
+print("Top item:", stack.peek())
+print("Popped item:", stack.pop())
+print("Stack size:", stack.size())
+print("Is empty:", stack.is_empty())
+"""
+
     return None
 
 
