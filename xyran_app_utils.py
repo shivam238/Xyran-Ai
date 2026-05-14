@@ -2,11 +2,12 @@ import os
 import shutil
 import time
 from datetime import datetime
+from urllib.parse import quote_plus
 
 from xyran_command_utils import focus_window, get_xdotool_window_ids
+from xyran_search import resolve_website_alias
 from xyran_input_utils import (
     extract_requested_app_name,
-    get_app_aliases,
     resolve_app_alias,
     wants_new_tab,
 )
@@ -39,6 +40,22 @@ def resolve_app_launch(user_input, run_command, command_failed):
         "label": app_info["label"],
         "command": f'{app_info["commands"][0]} &',
         "output": output,
+    }
+
+
+def resolve_known_website(user_input):
+    requested_target = extract_requested_app_name(user_input)
+    if not requested_target:
+        return None
+
+    alias_key, website = resolve_website_alias(requested_target)
+    if not website:
+        return None
+
+    return {
+        "requested_target": requested_target,
+        "resolved_key": alias_key,
+        "website": website,
     }
 
 
@@ -107,6 +124,19 @@ def smart_open_website(target, user_input, run_command):
     if requested_name and requested_name != friendly_name:
         return f"{requested_name} installed nahi mila, isliye website {friendly_name} mein khol di."
     return f"Website {friendly_name} mein khol di."
+
+
+def smart_search_web(query, user_input, run_command):
+    browser, requested_name = get_browser_for_request(user_input)
+    if not browser:
+        return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
+
+    friendly_name = get_browser_friendly_name(browser)
+    search_url = f"https://www.google.com/search?q={quote_plus(query)}"
+    run_command(f'{browser} "{search_url}" &')
+    if requested_name and requested_name != friendly_name:
+        return f"{requested_name} installed nahi mila, isliye `{query}` ko {friendly_name} mein search kar diya."
+    return f"`{query}` ko {friendly_name} mein search kar diya."
 
 
 def smart_open_youtube(user_input, run_command, last_browser_action):

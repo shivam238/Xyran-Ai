@@ -3,6 +3,13 @@ import random
 import re
 import shutil
 
+from xyran_search import (
+    extract_web_search_query,
+    is_web_search_request,
+    resolve_website_alias,
+    strip_trailing_action_clauses,
+)
+
 
 LOCAL_JOKES = [
     "Programmer ne paani kyu nahi piya? Kyunki usne socha bug liquid state mein bhi ho sakta hai.",
@@ -126,6 +133,11 @@ def extract_requested_app_name(user_input):
         if match:
             candidate = match.group(group_index)
             candidate = re.sub(r"\b(app|application)\b", "", candidate).strip()
+            candidate = strip_trailing_action_clauses(
+                candidate,
+                strip_search=True,
+                strip_write=True,
+            )
             candidate = " ".join(candidate.split())
             if candidate:
                 return candidate
@@ -203,7 +215,31 @@ def is_files_open_request(user_input):
 
 def wants_to_show_screenshot(user_input):
     lowered = user_input.lower()
-    return any(word in lowered for word in ["dikha", "dikhao", "show", "open", "khol"])
+    phrases = [
+        "show screenshot",
+        "show the screenshot",
+        "open screenshot",
+        "open the screenshot",
+        "screenshot dikha",
+        "screenshot dikhao",
+        "screenshot show",
+        "screenshot open",
+        "screenshot khol",
+        "screenshot kholo",
+        "open it",
+        "show it",
+        "dikha it",
+        "dikhao it",
+        "isko kholo",
+        "isko dikhao",
+    ]
+    if any(phrase in lowered for phrase in phrases):
+        return True
+    return re.search(
+        r"\b(?:show|open|dikha|dikhao|khol|kholo)\s+(?:it|isko|screenshot)\b",
+        lowered,
+        re.IGNORECASE,
+    ) is not None
 
 
 def is_text_editor_request(user_input):
@@ -259,6 +295,7 @@ def extract_text_to_write(user_input):
                         if updated != text:
                             text = updated
                             changed = True
+                text = strip_trailing_action_clauses(text, strip_search=False, strip_write=False)
             if text:
                 return text
     return None
@@ -490,7 +527,6 @@ def is_open_youtube_request(user_input):
     youtube_words = ["youtube", "yt"]
     return any(word in lowered for word in open_words) and any(word in lowered for word in youtube_words)
 
-
 def is_browser_open_request(user_input):
     lowered = user_input.lower().strip()
     open_words = ["open", "khol", "khol do", "kholo", "open karo", "open kr"]
@@ -527,6 +563,7 @@ def is_ambiguous_open_request(user_input):
     if any(
         check(lowered) for check in (
             is_open_youtube_request,
+            is_web_search_request,
             is_browser_open_request,
             is_files_open_request,
             is_text_editor_request,
