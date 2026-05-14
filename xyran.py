@@ -1,6 +1,7 @@
 import os
 import subprocess
 import json
+import re
 import shutil
 from datetime import datetime
 from groq import Groq
@@ -13,6 +14,7 @@ conversation_history = []
 last_input_used_vision = False
 vision_followup_turns_left = 0
 last_screenshot_path = None
+last_editor_file_path = None
 
 SYSTEM_PROMPT = f"""You are {AI_NAME}, a powerful personal AI agent on {USER_NAME}'s Fedora Linux + GNOME + Wayland system.
 You also have VISION — you can see the screen via screenshots.
@@ -119,6 +121,15 @@ Return ONLY valid JSON in one of these formats:
 
 def run_command(command):
     try:
+        if command.strip().endswith("&"):
+            subprocess.Popen(
+                command,
+                shell=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                env={**os.environ, "DISPLAY": ":0"}
+            )
+            return "Done."
         result = subprocess.run(
             command, shell=True, capture_output=True,
             text=True, timeout=15,
@@ -216,6 +227,72 @@ def wants_to_show_screenshot(user_input):
     return any(word in lowered for word in ["dikha", "dikhao", "show", "open", "khol"])
 
 
+def is_text_editor_request(user_input):
+    lowered = user_input.lower()
+    editor_words = ["text editor", "editor", "gedit", "gnome-text-editor", "notepad"]
+    open_words = ["open", "khol", "khol do", "kholde", "open kr", "open karo"]
+    write_words = ["likh", "write", "type"]
+    return any(word in lowered for word in editor_words) and (
+        any(word in lowered for word in open_words) or any(word in lowered for word in write_words)
+    )
+
+
+def extract_text_to_write(user_input):
+    patterns = [
+        r"likh\s+(.+)$",
+        r"likho\s+(.+)$",
+        r"write\s+(.+)$",
+        r"type\s+(.+)$",
+        r"(.+?)\s+likh$",
+        r"(.+?)\s+likho$",
+        r"(.+?)\s+write$",
+        r"(.+?)\s+type$",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, user_input, re.IGNORECASE)
+        if match:
+            text = match.group(1).strip().strip("\"'")
+            if text:
+                cleanup_patterns = [
+                    r"^(text editor|editor|gedit|gnome-text-editor|notepad)\s+",
+                    r"^(open|open kr|open karo|khol|khol do|kholo|kholde)\s+",
+                    r"^(or|aur)\s+",
+                ]
+                changed = True
+                while changed:
+                    changed = False
+                    for cleanup_pattern in cleanup_patterns:
+                        updated = re.sub(cleanup_pattern, "", text, flags=re.IGNORECASE).strip()
+                        if updated != text:
+                            text = updated
+                            changed = True
+            if text:
+                return text
+    return None
+
+
+def get_available_text_editor():
+    for candidate in ["gnome-text-editor", "gedit"]:
+        if shutil.which(candidate):
+            return candidate
+    return None
+
+
+def prepare_editor_file(initial_text=None):
+    global last_editor_file_path
+    folder = os.path.expanduser(f"~/Documents/{AI_NAME}")
+    os.makedirs(folder, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_path = os.path.join(folder, f"note-{timestamp}.txt")
+    with open(file_path, "w", encoding="utf-8") as file_obj:
+        if initial_text:
+            file_obj.write(initial_text)
+            if not initial_text.endswith("\n"):
+                file_obj.write("\n")
+    last_editor_file_path = file_path
+    return file_path
+
+
 def save_screenshot_copy(temp_path):
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     folder = os.path.expanduser(f"~/Pictures/{AI_NAME}-Screenshots")
@@ -230,6 +307,31 @@ def handle_direct_action(user_input):
     lowered = user_input.lower().strip()
 
     did_something = False
+
+    if is_text_editor_request(lowered):
+        editor = get_available_text_editor()
+        if not editor:
+            print("[Xyran] Koi supported text editor nahi mila. `gnome-text-editor` ya `gedit` install hona chahiye.")
+            return True
+
+        text_to_write = extract_text_to_write(user_input)
+        file_path = prepare_editor_file(text_to_write)
+
+        if text_to_write:
+            print(f"[Xyran] {editor} khol raha hoon aur file mein text likh diya hai")
+        else:
+            print(f"[Xyran] {editor} khol raha hoon")
+
+        print(f"[CMD] {editor} \"{file_path}\" &")
+        output = run_command(f'{editor} "{file_path}" &')
+        if output and output != "Done.":
+            print(f"[Output] {output}")
+
+        if text_to_write:
+            print(f"[Xyran] `{text_to_write}` file mein likh diya aur editor khol diya: {file_path}")
+        else:
+            print(f"[Xyran] Editor khol diya: {file_path}")
+        return True
 
     if is_files_open_request(lowered):
         print("[Xyran] Files app khol raha hoon")
