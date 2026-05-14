@@ -1,20 +1,59 @@
 import os
-import subprocess
 import json
 import re
 import shutil
-import random
-import difflib
-import shlex
+import time
 import urllib.request
 import urllib.error
 import urllib.parse
-import time
 from datetime import datetime
 from groq import Groq, RateLimitError
 from config import GROQ_API_KEY, MODEL, AI_NAME, USER_NAME, NEWS_API_KEY
 from vision import analyze_screen, take_screenshot
 import base64
+from xyran_app_utils import (
+    resolve_app_launch,
+    save_screenshot_copy,
+    smart_open_browser,
+    smart_open_website,
+    smart_open_youtube,
+)
+from xyran_command_utils import command_failed, run_command
+from xyran_input_utils import (
+    extract_news_selection_index,
+    extract_python_code_request,
+    extract_explicit_website_target,
+    extract_text_to_write,
+    get_editor_open_command,
+    get_local_joke,
+    get_local_smalltalk_reply,
+    get_news_query_params,
+    get_available_text_editor,
+    humanize_wait_time,
+    is_acknowledgement,
+    is_ambiguous_short_followup,
+    is_api_status_query,
+    is_app_launch_request,
+    is_browser_open_request,
+    is_explicit_website_request,
+    is_files_open_request,
+    is_greeting,
+    is_ambiguous_open_request,
+    is_joke_request,
+    is_more_news_request,
+    is_news_request,
+    is_news_summary_request,
+    is_open_youtube_request,
+    is_python_file_request,
+    is_rate_limit_time_query,
+    is_screenshot_request,
+    is_text_editor_request,
+    is_vision_followup,
+    should_use_vision,
+    wants_to_show_screenshot,
+)
+from xyran_news_state import load_news_state as read_news_state, save_news_state as write_news_state
+from xyran_prompts import build_system_prompt, build_vision_system_prompt
 
 try:
     import pyjokes
@@ -36,14 +75,6 @@ last_news_query_signature = None
 last_news_page = 1
 last_news_articles = []
 
-LOCAL_JOKES = [
-    "Programmer ne paani kyu nahi piya? Kyunki usne socha bug liquid state mein bhi ho sakta hai.",
-    "Ek coder bola: meri life sorted hai. Phir usne semicolon miss kar diya.",
-    "Debugging wahi process hai jahan hum detective bhi hote hain aur criminal bhi.",
-    "Computer ko thand kyu lag gayi? Kyunki usne Windows khuli chhod di.",
-    "Code itna clean tha ki bug ko rehne ke liye alag room lena pada."
-]
-
 FALLBACK_API_KEY = os.environ.get("FALLBACK_API_KEY", "").strip()
 FALLBACK_MODEL = os.environ.get("FALLBACK_MODEL", "").strip()
 FALLBACK_BASE_URL = os.environ.get(
@@ -51,187 +82,16 @@ FALLBACK_BASE_URL = os.environ.get(
     "https://openrouter.ai/api/v1/chat/completions"
 ).strip()
 NEWS_API_URL = "https://newsapi.org/v2/top-headlines"
-NEWS_STATE_PATH = os.path.join(os.path.dirname(__file__), "progress", "news_state.json")
+NEWS_STATE_PATH = os.path.join(
+    os.path.expanduser("~"),
+    ".local",
+    "state",
+    AI_NAME.lower(),
+    "news_state.json",
+)
 
-SYSTEM_PROMPT = f"""You are {AI_NAME}, a powerful personal AI agent on {USER_NAME}'s Fedora Linux + GNOME + Wayland system.
-You also have VISION — you can see the screen via screenshots.
-
-You MUST always reply in this JSON format only — no extra text:
-{{"action": "run", "command": "shell command", "explain": "kya kar raha hoon"}}
-{{"action": "run_multi", "commands": ["cmd1", "cmd2"], "explain": "kya kar raha hoon"}}
-{{"action": "answer", "message": "your answer here"}}
-{{"action": "look_and_act", "command": "shell command after seeing screen", "explain": "screen dekh ke ye kar raha hoon"}}
-
-SYSTEM INFO:
-- OS: Fedora Linux, GNOME, Wayland
-- Home: /home/{USER_NAME}
-- Desktop: /home/{USER_NAME}/Desktop
-- Downloads: /home/{USER_NAME}/Downloads
-- Shell: bash
-
-APPS:
-- Browser: google-chrome, brave-browser, or firefox
-- If user says Chrome/Google Chrome, prefer google-chrome if installed, otherwise brave-browser, otherwise firefox
-- Files: nautilus
-- Terminal: ptyxis, gnome-terminal, kgx, or gnome-console
-- Calculator: gnome-calculator
-- Text editor: gedit or gnome-text-editor
-- VS Code: code
-- Settings: gnome-control-center
-- Append & to run GUI apps in background
-
-FILE OPERATIONS:
-- Create file: touch ~/path/name.txt
-- Create folder: mkdir -p ~/path/folder
-- Delete: rm ~/path/file or rm -rf ~/path/folder
-- Move: mv source dest
-- Copy: cp source dest
-- List: ls -la ~/path
-- Find: find ~/ -name "filename"
-- Read: cat ~/path/file
-- Write: echo "content" > ~/path/file
-
-BROWSER:
-- Open site: brave-browser "https://site.com" &
-- Google search: brave-browser "https://www.google.com/search?q=query" &
-- YouTube: brave-browser "https://youtube.com" &
-
-SYSTEM:
-- Time: date +'%r'
-- Date: date +'%A, %d %B %Y'
-- Disk: df -h ~
-- RAM: free -h
-- CPU: lscpu | grep "Model name"
-- Battery: upower -i $(upower -e | grep battery) | grep -E "percentage|state|time to"
-- Kill app: pkill appname
-- Shutdown: systemctl poweroff
-- Restart: systemctl reboot
-- Volume up: wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
-- Volume down: wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
-- Mute: wpctl set-mute @DEFAULT_AUDIO_SINK@ 1
-- Unmute: wpctl set-mute @DEFAULT_AUDIO_SINK@ 0
-- Volume full: wpctl set-mute @DEFAULT_AUDIO_SINK@ 0 && wpctl set-volume @DEFAULT_AUDIO_SINK@ 100%
-- Screenshot already handled internally
-
-PACKAGE MANAGEMENT:
-- Install: sudo dnf install appname -y
-- Remove: sudo dnf remove appname -y
-- Update: sudo dnf update -y
-- Search: dnf search appname
-
-NETWORK:
-- Check internet: ping -c 1 google.com
-- IP: ip addr show
-- Wifi: nmcli dev wifi
-
-VISION RULES:
-- If user says "screen dekho", "kya chal raha hai", "screen pe kya hai", "dekh ke batao" — use action "answer", vision already handled
-- If user says "ye wali file kholo", "jo browser mein khula hai", referring to something on screen — vision context already given to you
-- Always use screen context when available to give smarter answers
-
-RULES:
-- Always use & when opening GUI apps
-- Respond in same language as user (Hindi/English/Hinglish)
-- explain field mein batao kya kar rahe ho
-- If unsure, say so honestly
-"""
-
-VISION_SYSTEM_PROMPT = f"""You are {AI_NAME}'s screen-reading vision module.
-
-Your job is to describe ONLY what is clearly visible in the provided screenshot.
-
-Hard rules:
-- Start by identifying the frontmost/center-most active window first.
-- If multiple windows are visible, mention all clearly visible windows in visual priority order.
-- Give higher priority to the large centered dialog/window than to sidebars or background editors.
-- Never guess the website, app, tab, or file name from dock/sidebar icons alone.
-- Never assume YouTube, Brave, Chrome, terminal content, or any other app unless it is clearly readable in the main visible window.
-- If text is blurry, partially hidden, too small, or uncertain, say that honestly.
-- Focus on the main foreground window/content, not the launcher/dock/app grid.
-- Distinguish between "installed apps shown as icons" and "actually open visible windows".
-- Prefer answers like "clear nahi dikh raha" over invented details.
-
-Return ONLY valid JSON in one of these formats:
-{{"action": "answer", "message": "screen par jo clearly visible hai woh yahan batao"}}
-{{"action": "look_and_act", "command": "shell command", "explain": "screen dekh ke kya kar raha hoon"}}
-"""
-
-
-def run_command(command):
-    try:
-        stripped_command = command.strip()
-        executable_error = get_command_executable_error(stripped_command)
-        if executable_error:
-            return executable_error
-
-        if stripped_command.endswith("&"):
-            launch_command = stripped_command[:-1].strip()
-            subprocess.Popen(
-                launch_command,
-                shell=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                env={**os.environ, "DISPLAY": ":0"}
-            )
-            return "Done."
-        result = subprocess.run(
-            stripped_command, shell=True, capture_output=True,
-            text=True, timeout=15,
-            env={**os.environ, "DISPLAY": ":0"}
-        )
-        output = result.stdout.strip() + result.stderr.strip()
-        return output if output else "Done."
-    except subprocess.TimeoutExpired:
-        return "Command timeout ho gaya."
-    except Exception as e:
-        return f"Error: {e}"
-
-
-def get_command_executable_error(command):
-    if not command:
-        return None
-
-    stripped = command.strip()
-    if stripped.endswith("&"):
-        stripped = stripped[:-1].strip()
-
-    if not stripped:
-        return None
-
-    if any(token in stripped for token in ["|", "&&", "||", ";", "$(", "`", ">","<"]):
-        return None
-
-    try:
-        parts = shlex.split(stripped)
-    except Exception:
-        return None
-
-    if not parts:
-        return None
-
-    executable = parts[0]
-    shell_builtins = {
-        "cd", "echo", "pwd", "test", "[", "alias", "export", "source",
-        "set", "unset", "true", "false", "printf"
-    }
-    if executable in shell_builtins:
-        return None
-
-    if "/" in executable:
-        if os.path.isfile(executable) and os.access(executable, os.X_OK):
-            return None
-        return f"Error: `{executable}` executable nahi mila."
-
-    if shutil.which(executable):
-        return None
-    return f"Error: `{executable}` command nahi mila."
-
-
-def command_failed(output):
-    if not output:
-        return False
-    lowered = output.lower()
-    return lowered.startswith("error:") or "command not found" in lowered
+SYSTEM_PROMPT = build_system_prompt(AI_NAME, USER_NAME)
+VISION_SYSTEM_PROMPT = build_vision_system_prompt(AI_NAME)
 
 
 def has_fallback_provider():
@@ -289,311 +149,22 @@ def summarize_output(output):
 
 def load_news_state():
     global last_news_titles, last_news_query_signature, last_news_page, last_news_articles
-    try:
-        if not os.path.exists(NEWS_STATE_PATH):
-            return
-        with open(NEWS_STATE_PATH, "r", encoding="utf-8") as file_obj:
-            state = json.load(file_obj)
-        last_news_titles = state.get("last_news_titles", [])
-        last_news_query_signature = state.get("last_news_query_signature")
-        last_news_page = int(state.get("last_news_page", 1))
-        last_news_articles = state.get("last_news_articles", [])
-    except Exception:
-        last_news_titles = []
-        last_news_query_signature = None
-        last_news_page = 1
-        last_news_articles = []
+    (
+        last_news_titles,
+        last_news_query_signature,
+        last_news_page,
+        last_news_articles,
+    ) = read_news_state(NEWS_STATE_PATH)
 
 
 def save_news_state():
-    try:
-        os.makedirs(os.path.dirname(NEWS_STATE_PATH), exist_ok=True)
-        with open(NEWS_STATE_PATH, "w", encoding="utf-8") as file_obj:
-            json.dump(
-                {
-                    "last_news_titles": last_news_titles,
-                    "last_news_query_signature": last_news_query_signature,
-                    "last_news_page": last_news_page,
-                    "last_news_articles": last_news_articles,
-                },
-                file_obj,
-                ensure_ascii=True,
-                indent=2,
-            )
-    except Exception:
-        pass
-
-
-def should_use_vision(user_input):
-    vision_keywords = [
-        "screen dekho", "kya chal raha", "kya khula", "kya dikh raha",
-        "screen pe kya", "dikhao", "jo khula hai", "kon se apps",
-        "can u see", "screen check", "dekh ke batao", "window mein",
-        "browser mein kya", "screen pe", "kya open hai", "screen par",
-        "screen pr", "screen par hai", "screen pr hai", "padho",
-        "read the code", "code padh", "koi file dikh", "konsa folder",
-        "kaun sa folder", "ab check", "dobara dekho", "fir dekho"
-    ]
-    lowered = user_input.lower()
-    return any(kw in lowered for kw in vision_keywords)
-
-
-def is_vision_followup(user_input):
-    followup_keywords = [
-        "haan", "batao", "btao", "padho", "check", "dekho", "dobara",
-        "fir", "again", "screen pr hai", "screen par hai", "kya hai",
-        "kya dikh", "koi file", "folder", "file ka naam", "kon kon",
-        "kaun kaun", "isme", "usme", "waha", "vahaan", "details",
-        "detail", "sari details", "sab details", "aur batao",
-        "uski details", "poori details", "full details", "kya chal",
-        "kya open", "kya khula", "kya chal raha"
-    ]
-    lowered = user_input.lower()
-    return any(kw in lowered for kw in followup_keywords)
-
-
-def is_ambiguous_short_followup(user_input):
-    lowered = user_input.lower().strip()
-    word_count = len(lowered.split())
-    ambiguous_phrases = [
-        "sari details do", "sab details do", "details do", "detail do",
-        "aur batao", "aur btao", "ab batao", "ab dekho", "ab check karo",
-        "ab check kro", "uski details do", "poori details do",
-        "full details do", "sahi se batao"
-    ]
-    return word_count <= 5 and any(phrase in lowered for phrase in ambiguous_phrases)
-
-
-def is_acknowledgement(user_input):
-    lowered = user_input.lower().strip()
-    acknowledgements = {
-        "ok", "okay", "okk", "k", "kk", "haan", "hm", "hmm", "hmmm",
-        "thanks", "thank you", "thx", "theek", "theek hai", "achha",
-        "acha", "nice", "good", "great", "cool"
-    }
-    return lowered in acknowledgements
-
-
-def is_greeting(user_input):
-    lowered = user_input.lower().strip()
-    if lowered in {"yo", "namaste", "salam"}:
-        return True
-    compact = re.sub(r"(.)\1+", r"\1", lowered)
-    return compact in {"hi", "hello", "hey"}
-
-
-def get_local_smalltalk_reply(user_input):
-    lowered = user_input.lower().strip()
-
-    farewell_map = {
-        "bye": "Theek hai, phir milte hain.",
-        "goodbye": "Theek hai, phir milte hain.",
-        "good bye": "Theek hai, phir milte hain.",
-        "milte hain": "Theek hai, phir milte hain.",
-        "phir milte hain": "Theek hai, phir milte hain.",
-        "see you": "Theek hai, phir milte hain.",
-        "cya": "Theek hai, phir milte hain.",
-    }
-    thanks_map = {
-        "shukriya": "Khushi hui help karke.",
-        "dhanyawad": "Khushi hui help karke.",
-        "dhanyavaad": "Khushi hui help karke.",
-        "thanku": "Khushi hui help karke.",
-        "thank u": "Khushi hui help karke.",
-        "ty": "Khushi hui help karke.",
-    }
-    night_map = {
-        "good night": "Good night. Aaram se rest karo.",
-        "gn": "Good night. Aaram se rest karo.",
-        "night": "Good night. Aaram se rest karo.",
-    }
-
-    if lowered in farewell_map:
-        return farewell_map[lowered]
-    if lowered in thanks_map:
-        return thanks_map[lowered]
-    if lowered in night_map:
-        return night_map[lowered]
-    return None
-
-
-def is_app_launch_request(user_input):
-    lowered = user_input.lower().strip()
-    open_words = ["open", "khol", "khol do", "kholo", "open karo", "open kr"]
-    return any(word in lowered for word in open_words)
-
-
-def extract_requested_app_name(user_input):
-    lowered = user_input.lower().strip()
-    patterns = [
-        (r"^(.*?)\s+(open|khol|khol do|kholo|open karo|open kr)$", 1),
-        (r"^(open|khol|khol do|kholo|open karo|open kr)\s+(.+)$", 2),
-    ]
-    for pattern, group_index in patterns:
-        match = re.search(pattern, lowered)
-        if match:
-            candidate = match.group(group_index)
-            candidate = re.sub(r"\b(app|application)\b", "", candidate).strip()
-            candidate = " ".join(candidate.split())
-            if candidate:
-                return candidate
-    return None
-
-
-def get_app_aliases():
-    return {
-        "terminal": {
-            "label": "Terminal",
-            "commands": ["ptyxis", "gnome-terminal", "kgx", "gnome-console"],
-        },
-        "extensions": {
-            "label": "GNOME Extensions",
-            "commands": ["gnome-control-center extensions"],
-        },
-        "settings": {
-            "label": "Settings",
-            "commands": ["gnome-control-center"],
-        },
-        "files": {
-            "label": "Files",
-            "commands": ["nautilus"],
-        },
-        "file manager": {
-            "label": "Files",
-            "commands": ["nautilus"],
-        },
-        "helvum": {
-            "label": "Helvum",
-            "commands": ["helvum"],
-        },
-        "code": {
-            "label": "VS Code",
-            "commands": ["code"],
-        },
-        "vs code": {
-            "label": "VS Code",
-            "commands": ["code"],
-        },
-        "vscode": {
-            "label": "VS Code",
-            "commands": ["code"],
-        },
-        "calculator": {
-            "label": "Calculator",
-            "commands": ["gnome-calculator"],
-        },
-    }
-
-
-def resolve_app_launch(user_input):
-    requested_app = extract_requested_app_name(user_input)
-    if not requested_app:
-        return None
-
-    aliases = get_app_aliases()
-    alias_key = requested_app
-    if alias_key not in aliases:
-        close_matches = difflib.get_close_matches(alias_key, list(aliases.keys()), n=1, cutoff=0.72)
-        if close_matches:
-            alias_key = close_matches[0]
-        else:
-            return None
-
-    app_info = aliases[alias_key]
-    for command in app_info["commands"]:
-        output = run_command(f"{command} &")
-        if not command_failed(output):
-            return {
-                "requested_app": requested_app,
-                "resolved_key": alias_key,
-                "label": app_info["label"],
-                "command": f"{command} &",
-                "output": output,
-            }
-
-    return {
-        "requested_app": requested_app,
-        "resolved_key": alias_key,
-        "label": app_info["label"],
-        "command": f'{app_info["commands"][0]} &',
-        "output": output,
-    }
-
-
-def is_screenshot_request(user_input):
-    lowered = user_input.lower()
-    screenshot_words = ["screenshot", "screen shot", "ss le", "ss lo", "capture screen"]
-    return any(word in lowered for word in screenshot_words)
-
-
-def is_files_open_request(user_input):
-    lowered = user_input.lower()
-    open_words = ["open", "khol", "khol do", "kholde", "khol do", "open kr", "open karo"]
-    file_words = ["files", "file manager", "nautilus", "folder"]
-    return any(word in lowered for word in open_words) and any(word in lowered for word in file_words)
-
-
-def wants_to_show_screenshot(user_input):
-    lowered = user_input.lower()
-    return any(word in lowered for word in ["dikha", "dikhao", "show", "open", "khol"])
-
-
-def is_text_editor_request(user_input):
-    lowered = user_input.lower()
-    editor_words = ["text editor", "editor", "gedit", "gnome-text-editor", "notepad"]
-    open_words = ["open", "khol", "khol do", "kholde", "open kr", "open karo"]
-    write_words = ["likh", "write", "type"]
-    return any(word in lowered for word in editor_words) and (
-        any(word in lowered for word in open_words) or any(word in lowered for word in write_words)
+    write_news_state(
+        NEWS_STATE_PATH,
+        last_news_titles,
+        last_news_query_signature,
+        last_news_page,
+        last_news_articles,
     )
-
-
-def is_python_file_request(user_input):
-    lowered = user_input.lower()
-    create_words = ["new", "banao", "bnao", "create", "bana do", "bna do"]
-    python_words = ["py file", "python file", ".py"]
-    return any(word in lowered for word in create_words) and any(word in lowered for word in python_words)
-
-
-def extract_text_to_write(user_input):
-    patterns = [
-        r"likh\s+(.+)$",
-        r"likho\s+(.+)$",
-        r"write\s+(.+)$",
-        r"type\s+(.+)$",
-        r"(.+?)\s+likh$",
-        r"(.+?)\s+likho$",
-        r"(.+?)\s+write$",
-        r"(.+?)\s+type$",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, user_input, re.IGNORECASE)
-        if match:
-            text = match.group(1).strip().strip("\"'")
-            if text:
-                cleanup_patterns = [
-                    r"^(text editor|editor|gedit|gnome-text-editor|notepad)\s+",
-                    r"^(open|open kr|open karo|khol|khol do|kholo|kholde)\s+",
-                    r"^(or|aur)\s+",
-                ]
-                changed = True
-                while changed:
-                    changed = False
-                    for cleanup_pattern in cleanup_patterns:
-                        updated = re.sub(cleanup_pattern, "", text, flags=re.IGNORECASE).strip()
-                        if updated != text:
-                            text = updated
-                            changed = True
-            if text:
-                return text
-    return None
-
-
-def get_available_text_editor():
-    for candidate in ["gnome-text-editor", "gedit"]:
-        if shutil.which(candidate):
-            return candidate
-    return None
 
 
 def prepare_editor_file(initial_text=None):
@@ -624,193 +195,6 @@ def prepare_python_file(initial_code=None):
                 file_obj.write("\n")
     last_created_code_file = file_path
     return file_path
-
-
-def extract_python_code_request(user_input):
-    lowered = user_input.lower()
-    if "hello print" in lowered or "print hello" in lowered:
-        return 'print("hello")'
-    if "hello world print" in lowered or "print hello world" in lowered:
-        return 'print("hello world")'
-    return None
-
-
-def get_editor_open_command(file_path):
-    editor = shutil.which("code")
-    if editor:
-        return f'code "{file_path}" &'
-    editor = get_available_text_editor()
-    if editor:
-        return f'{editor} "{file_path}" &'
-    return None
-
-
-def humanize_wait_time(wait_text):
-    normalized = re.sub(r"(\d+)\.\d+s", r"\1s", wait_text.lower())
-    parts = re.findall(r"(\d+)([hms])", normalized)
-    if not parts:
-        return wait_text
-
-    labels = {"h": "hour", "m": "minute", "s": "second"}
-    human_parts = []
-    for value, unit in parts:
-        label = labels[unit]
-        if value != "1":
-            label += "s"
-        human_parts.append(f"{value} {label}")
-    return " ".join(human_parts)
-
-
-def is_rate_limit_time_query(user_input):
-    lowered = user_input.lower().strip()
-    phrases = [
-        "kitna time bacha hai",
-        "kitna wait hai",
-        "kab tak wait",
-        "kab tak rukna hai",
-        "how much time left",
-        "time left",
-        "kitni der baaki hai",
-    ]
-    return any(phrase in lowered for phrase in phrases)
-
-
-def is_joke_request(user_input):
-    lowered = user_input.lower().strip()
-    phrases = [
-        "tell me a joke", "joke suna", "joke sunao", "koi joke",
-        "majak suna", "funny bol", "hasao", "make me laugh"
-    ]
-    return any(phrase in lowered for phrase in phrases)
-
-
-def get_local_joke():
-    if pyjokes:
-        try:
-            return pyjokes.get_joke()
-        except Exception:
-            pass
-    return random.choice(LOCAL_JOKES)
-
-
-def is_news_request(user_input):
-    lowered = user_input.lower().strip()
-    return "news" in lowered or "headlines" in lowered
-
-
-def is_more_news_request(user_input):
-    global last_news_query_signature
-    lowered = user_input.lower().strip()
-    phrases = [
-        "more news", "aur news", "next news", "next headlines",
-        "more headlines", "aur headlines", "dusri news", "doosri news",
-        "agli news"
-    ]
-    short_followups = {"next", "aur", "more", "dusri", "doosri", "agli"}
-    if lowered in short_followups:
-        return bool(last_news_query_signature)
-    return any(phrase in lowered for phrase in phrases)
-
-
-def is_news_summary_request(user_input):
-    lowered = user_input.lower().strip()
-    summary_words = [
-        "summary", "summarize", "explain", "detail", "details",
-        "samjha", "samjhao", "detail mein", "brief", "gist"
-    ]
-    reference_words = [
-        "news", "headline", "article", "pehli", "dusri", "doosri",
-        "teesri", "fourth", "fifth", "first", "second", "third",
-        "1", "2", "3", "4", "5"
-    ]
-    return any(word in lowered for word in summary_words) and (
-        any(word in lowered for word in reference_words) or bool(last_news_articles)
-    )
-
-
-def extract_news_selection_index(user_input, max_items):
-    lowered = user_input.lower().strip()
-    match = re.search(r"\b([1-9])\b", lowered)
-    if match:
-        index = int(match.group(1)) - 1
-        if 0 <= index < max_items:
-            return index
-
-    ordinal_map = {
-        "first": 0,
-        "pehli": 0,
-        "pehla": 0,
-        "1st": 0,
-        "second": 1,
-        "dusri": 1,
-        "doosri": 1,
-        "dusra": 1,
-        "2nd": 1,
-        "third": 2,
-        "teesri": 2,
-        "teesra": 2,
-        "3rd": 2,
-        "fourth": 3,
-        "chauthi": 3,
-        "chautha": 3,
-        "4th": 3,
-        "fifth": 4,
-        "paanchvi": 4,
-        "paanchva": 4,
-        "5th": 4,
-    }
-    for word, index in ordinal_map.items():
-        if word in lowered and index < max_items:
-            return index
-    return 0 if max_items else None
-
-
-def get_news_query_params(user_input):
-    lowered = user_input.lower().strip()
-    params = {"country": "in", "pageSize": "5"}
-
-    categories = {
-        "tech": "technology",
-        "technology": "technology",
-        "sports": "sports",
-        "sport": "sports",
-        "business": "business",
-        "health": "health",
-        "science": "science",
-        "entertainment": "entertainment",
-        "general": "general",
-    }
-
-    countries = {
-        "india": "in",
-        "indian": "in",
-        "us": "us",
-        "usa": "us",
-        "america": "us",
-        "uk": "gb",
-        "britain": "gb",
-    }
-
-    for keyword, category in categories.items():
-        if keyword in lowered:
-            params["category"] = category
-            break
-
-    for keyword, country in countries.items():
-        if keyword in lowered:
-            params["country"] = country
-            break
-
-    query_cleanup = re.sub(
-        r"\b(latest|today|news|headlines|batao|sunao|show|tell me|about|do|de|dena|dijiye|please|plz|more|next|aur|dusri|doosri|agli|second)\b",
-        "",
-        lowered
-    )
-    query_cleanup = " ".join(query_cleanup.split()).strip()
-    if query_cleanup and query_cleanup not in categories and query_cleanup not in countries:
-        params["q"] = query_cleanup
-
-    return params
 
 
 def summarize_news_article(user_input):
@@ -897,7 +281,7 @@ def fetch_news_headlines(user_input):
             return json.loads(response.read().decode("utf-8"))
 
     params = get_news_query_params(user_input)
-    is_more_request = is_more_news_request(user_input)
+    is_more_request = is_more_news_request(user_input, bool(last_news_query_signature))
     default_params = {"country": "in", "pageSize": "5"}
     if is_more_request and params == default_params and last_news_query_signature:
         try:
@@ -994,180 +378,8 @@ def fetch_news_headlines(user_input):
     return "\n".join(lines)
 
 
-def is_api_status_query(user_input):
-    lowered = user_input.lower().strip()
-    phrases = [
-        "api aa gya hai", "api aa gaya hai", "api aagya hai",
-        "api back hai", "api wapas aayi", "api chal rahi hai",
-        "is api back", "api back"
-    ]
-    return any(phrase in lowered for phrase in phrases)
-
-
-def is_open_youtube_request(user_input):
-    lowered = user_input.lower().strip()
-    open_words = ["open", "khol", "khol do", "kholo", "open karo", "open kr"]
-    youtube_words = ["youtube", "yt"]
-    return any(word in lowered for word in open_words) and any(word in lowered for word in youtube_words)
-
-
-def is_browser_open_request(user_input):
-    lowered = user_input.lower().strip()
-    open_words = ["open", "khol", "khol do", "kholo", "open karo", "open kr"]
-    browser_words = [
-        "browser", "brave", "firefox", "chrome", "google chrome",
-        "web browser"
-    ]
-    return any(word in lowered for word in open_words) and any(word in lowered for word in browser_words)
-
-
-def get_available_browser():
-    for candidate in ["google-chrome", "google-chrome-stable", "brave-browser", "firefox"]:
-        if shutil.which(candidate):
-            return candidate
-    return None
-
-
-def get_browser_for_request(user_input):
-    lowered = user_input.lower().strip()
-    requested_name = None
-    requested_browser = None
-
-    if "firefox" in lowered:
-        requested_name = "Firefox"
-        requested_browser = "firefox"
-    elif "google chrome" in lowered or "chrome" in lowered:
-        requested_name = "Google Chrome"
-        requested_browser = "google-chrome"
-    elif "brave" in lowered:
-        requested_name = "Brave"
-        requested_browser = "brave-browser"
-
-    if requested_browser and shutil.which(requested_browser):
-        return requested_browser, requested_name
-
-    browser = get_available_browser()
-    return browser, requested_name
-
-
-def get_browser_friendly_name(browser):
-    if browser in {"google-chrome", "google-chrome-stable"}:
-        return "Google Chrome"
-    if browser == "brave-browser":
-        return "Brave"
-    if browser == "firefox":
-        return "Firefox"
-    return browser or "Browser"
-
-
-def smart_open_browser(user_input):
-    browser, requested_name = get_browser_for_request(user_input)
-    if not browser:
-        return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
-
-    friendly_name = get_browser_friendly_name(browser)
-
-    run_command(f"{browser} &")
-    if requested_name and requested_name != friendly_name:
-        return f"{requested_name} installed nahi mila, isliye {friendly_name} khol diya."
-    return f"{friendly_name} khol diya."
-
-
-def wants_new_tab(user_input):
-    lowered = user_input.lower().strip()
-    phrases = [
-        "new tab", "naye tab", "naya tab", "dusre tab", "doosre tab",
-        "another tab", "second tab", "alag tab"
-    ]
-    return any(phrase in lowered for phrase in phrases)
-
-
-def get_xdotool_window_ids(search_term, use_class=False):
-    search_flag = "--class" if use_class else "--name"
-    try:
-        result = subprocess.run(
-            f'xdotool search {search_flag} "{search_term}"',
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            env={**os.environ, "DISPLAY": ":0"}
-        )
-        if result.returncode != 0 or not result.stdout.strip():
-            return []
-        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
-    except Exception:
-        return []
-
-
-def focus_window(window_id):
-    try:
-        subprocess.run(
-            f"xdotool windowmap {window_id} windowactivate {window_id}",
-            shell=True,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            env={**os.environ, "DISPLAY": ":0"}
-        )
-        return True
-    except Exception:
-        return False
-
-
-def smart_open_youtube(user_input):
-    global last_browser_action
-    now = time.monotonic()
-    browser, requested_name = get_browser_for_request(user_input)
-    if not browser:
-        return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
-
-    browser_name = get_browser_friendly_name(browser)
-    if (
-        last_browser_action["target"] == "youtube"
-        and last_browser_action.get("browser") == browser
-        and now - last_browser_action["time"] < 3
-    ):
-        return "YouTube abhi abhi handle kiya tha, isliye dobara open nahi kar raha."
-
-    youtube_window_ids = get_xdotool_window_ids("YouTube")
-    browser_window_ids = get_xdotool_window_ids(browser, use_class=True)
-
-    if wants_new_tab(user_input):
-        run_command(f'{browser} --new-tab "https://youtube.com" &')
-        if browser_window_ids:
-            focus_window(browser_window_ids[-1])
-        last_browser_action = {"target": "youtube", "browser": browser, "time": now}
-        if requested_name and requested_name != browser_name:
-            return f"{requested_name} installed nahi mila, isliye YouTube {browser_name} ke naye tab mein khol diya."
-        return f"YouTube {browser_name} ke naye tab mein khol diya."
-
-    if youtube_window_ids:
-        focus_window(youtube_window_ids[-1])
-        last_browser_action = {"target": "youtube", "browser": browser, "time": now}
-        return f"YouTube pehle se open tha, usi tab ko saamne le aaya."
-
-    run_command(f'{browser} "https://youtube.com" &')
-    updated_browser_window_ids = get_xdotool_window_ids(browser, use_class=True)
-    if updated_browser_window_ids:
-        focus_window(updated_browser_window_ids[-1])
-    last_browser_action = {"target": "youtube", "browser": browser, "time": now}
-    if requested_name and requested_name != browser_name:
-        return f"{requested_name} installed nahi mila, isliye YouTube {browser_name} mein khol diya."
-    return f"YouTube {browser_name} mein khol diya."
-
-
-def save_screenshot_copy(temp_path):
-    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    folder = os.path.expanduser(f"~/Pictures/{AI_NAME}-Screenshots")
-    os.makedirs(folder, exist_ok=True)
-    final_path = os.path.join(folder, f"screenshot-{timestamp}.png")
-    shutil.copy(temp_path, final_path)
-    return final_path
-
-
 def handle_direct_action(user_input):
-    global last_screenshot_path, last_rate_limit_wait_text
+    global last_screenshot_path, last_rate_limit_wait_text, last_browser_action
     lowered = user_input.lower().strip()
 
     did_something = False
@@ -1186,15 +398,15 @@ def handle_direct_action(user_input):
         return True
 
     if is_joke_request(lowered):
-        print(f"[Xyran] {get_local_joke()}")
+        print(f"[Xyran] {get_local_joke(pyjokes)}")
         return True
 
-    if is_news_summary_request(lowered):
+    if is_news_summary_request(lowered, bool(last_news_articles)):
         print("[Xyran] News ka summary bana raha hoon...")
         print(f"[Xyran] {summarize_news_article(user_input)}")
         return True
 
-    if is_more_news_request(lowered):
+    if is_more_news_request(lowered, bool(last_news_query_signature)):
         print("[Xyran] Aur news la raha hoon...")
         print(f"[Xyran] {fetch_news_headlines(user_input)}")
         return True
@@ -1213,18 +425,28 @@ def handle_direct_action(user_input):
 
     if is_open_youtube_request(lowered):
         print("[Xyran] YouTube handle kar raha hoon")
-        message = smart_open_youtube(user_input)
+        message, last_browser_action = smart_open_youtube(user_input, run_command, last_browser_action)
         print(f"[Xyran] {message}")
         return True
 
     if is_browser_open_request(lowered):
         print("[Xyran] Browser khol raha hoon...")
-        message = smart_open_browser(user_input)
+        message = smart_open_browser(user_input, run_command)
+        print(f"[Xyran] {message}")
+        return True
+
+    if is_explicit_website_request(lowered):
+        website_target = extract_explicit_website_target(user_input)
+        if not website_target:
+            print("[Xyran] Website kholne ke liye exact URL ya domain chahiye, jaise `open github.com`.")
+            return True
+        print("[Xyran] Website khol raha hoon...")
+        message = smart_open_website(website_target, user_input, run_command)
         print(f"[Xyran] {message}")
         return True
 
     if is_app_launch_request(lowered):
-        app_result = resolve_app_launch(user_input)
+        app_result = resolve_app_launch(user_input, run_command, command_failed)
         if app_result:
             print(f"[Xyran] {app_result['label']} khol raha hoon")
             print(f"[CMD] {app_result['command']}")
@@ -1237,6 +459,11 @@ def handle_direct_action(user_input):
             else:
                 print("[Xyran] Ho gaya.")
             return True
+
+    if is_ambiguous_open_request(lowered):
+        requested_app = extract_requested_app_name(user_input) or "yeh"
+        print(f"[Xyran] `{requested_app}` mujhe known app ya clear website nahi laga, isliye guess karke kuch open nahi kar raha. App naam ya exact domain bolo.")
+        return True
 
     if is_rate_limit_time_query(lowered):
         if last_rate_limit_wait_text:
@@ -1270,6 +497,8 @@ def handle_direct_action(user_input):
             print(f"[Xyran] Python file bana di: {file_path}")
         return True
 
+    screenshot_requested = is_screenshot_request(lowered)
+
     if is_text_editor_request(lowered):
         editor = get_available_text_editor()
         if not editor:
@@ -1296,7 +525,9 @@ def handle_direct_action(user_input):
             print(f"[Xyran] `{text_to_write}` file mein likh diya aur editor khol diya: {file_path}")
         else:
             print(f"[Xyran] Editor khol diya: {file_path}")
-        return True
+        did_something = True
+        if not screenshot_requested:
+            return True
 
     if is_files_open_request(lowered):
         print("[Xyran] Files app khol raha hoon")
@@ -1310,14 +541,16 @@ def handle_direct_action(user_input):
             print("[Xyran] Ye command sahi se run nahi hui.")
         did_something = True
 
-    if is_screenshot_request(lowered):
+    if screenshot_requested:
+        if is_text_editor_request(lowered):
+            time.sleep(1.2)
         print("[Xyran] Screenshot le raha hoon...")
         temp_path, err = take_screenshot()
         if not temp_path:
             print(f"[Xyran] Screenshot nahi le paya: {err}")
             return True
 
-        saved_path = save_screenshot_copy(temp_path)
+        saved_path = save_screenshot_copy(temp_path, AI_NAME)
         os.remove(temp_path)
         last_screenshot_path = saved_path
 

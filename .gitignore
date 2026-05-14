@@ -1,7 +1,27 @@
+# Python cache
 __pycache__/
-*.pyc
-Groq-Api-Key.txt
-.env
+*.py[cod]
+
+# Virtual environments
+.venv/
 venv/
-progress/
+env/
+
+# Local environment files
+.env
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Project-local state / secrets
+.xyran_news_state.json
 API_KEYS/
+
+# Local Codex metadata
+.agents/
+.codex/
+
+# OS / editor noise
+.DS_Store
