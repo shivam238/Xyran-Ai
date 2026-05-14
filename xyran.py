@@ -4,9 +4,15 @@ import json
 import re
 import shutil
 import random
+import difflib
+import shlex
+import urllib.request
+import urllib.error
+import urllib.parse
+import time
 from datetime import datetime
 from groq import Groq, RateLimitError
-from config import GROQ_API_KEY, MODEL, AI_NAME, USER_NAME
+from config import GROQ_API_KEY, MODEL, AI_NAME, USER_NAME, NEWS_API_KEY
 from vision import analyze_screen, take_screenshot
 import base64
 
@@ -23,6 +29,12 @@ last_screenshot_path = None
 last_editor_file_path = None
 last_created_code_file = None
 last_rate_limit_wait_text = None
+last_provider_used = "groq"
+last_browser_action = {"target": None, "time": 0.0}
+last_news_titles = []
+last_news_query_signature = None
+last_news_page = 1
+last_news_articles = []
 
 LOCAL_JOKES = [
     "Programmer ne paani kyu nahi piya? Kyunki usne socha bug liquid state mein bhi ho sakta hai.",
@@ -31,6 +43,15 @@ LOCAL_JOKES = [
     "Computer ko thand kyu lag gayi? Kyunki usne Windows khuli chhod di.",
     "Code itna clean tha ki bug ko rehne ke liye alag room lena pada."
 ]
+
+FALLBACK_API_KEY = os.environ.get("FALLBACK_API_KEY", "").strip()
+FALLBACK_MODEL = os.environ.get("FALLBACK_MODEL", "").strip()
+FALLBACK_BASE_URL = os.environ.get(
+    "FALLBACK_BASE_URL",
+    "https://openrouter.ai/api/v1/chat/completions"
+).strip()
+NEWS_API_URL = "https://newsapi.org/v2/top-headlines"
+NEWS_STATE_PATH = os.path.join(os.path.dirname(__file__), "progress", "news_state.json")
 
 SYSTEM_PROMPT = f"""You are {AI_NAME}, a powerful personal AI agent on {USER_NAME}'s Fedora Linux + GNOME + Wayland system.
 You also have VISION — you can see the screen via screenshots.
@@ -49,9 +70,10 @@ SYSTEM INFO:
 - Shell: bash
 
 APPS:
-- Browser: brave-browser or firefox
+- Browser: google-chrome, brave-browser, or firefox
+- If user says Chrome/Google Chrome, prefer google-chrome if installed, otherwise brave-browser, otherwise firefox
 - Files: nautilus
-- Terminal: gnome-terminal
+- Terminal: ptyxis, gnome-terminal, kgx, or gnome-console
 - Calculator: gnome-calculator
 - Text editor: gedit or gnome-text-editor
 - VS Code: code
@@ -137,9 +159,15 @@ Return ONLY valid JSON in one of these formats:
 
 def run_command(command):
     try:
-        if command.strip().endswith("&"):
+        stripped_command = command.strip()
+        executable_error = get_command_executable_error(stripped_command)
+        if executable_error:
+            return executable_error
+
+        if stripped_command.endswith("&"):
+            launch_command = stripped_command[:-1].strip()
             subprocess.Popen(
-                command,
+                launch_command,
                 shell=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
@@ -147,7 +175,7 @@ def run_command(command):
             )
             return "Done."
         result = subprocess.run(
-            command, shell=True, capture_output=True,
+            stripped_command, shell=True, capture_output=True,
             text=True, timeout=15,
             env={**os.environ, "DISPLAY": ":0"}
         )
@@ -157,6 +185,80 @@ def run_command(command):
         return "Command timeout ho gaya."
     except Exception as e:
         return f"Error: {e}"
+
+
+def get_command_executable_error(command):
+    if not command:
+        return None
+
+    stripped = command.strip()
+    if stripped.endswith("&"):
+        stripped = stripped[:-1].strip()
+
+    if not stripped:
+        return None
+
+    if any(token in stripped for token in ["|", "&&", "||", ";", "$(", "`", ">","<"]):
+        return None
+
+    try:
+        parts = shlex.split(stripped)
+    except Exception:
+        return None
+
+    if not parts:
+        return None
+
+    executable = parts[0]
+    shell_builtins = {
+        "cd", "echo", "pwd", "test", "[", "alias", "export", "source",
+        "set", "unset", "true", "false", "printf"
+    }
+    if executable in shell_builtins:
+        return None
+
+    if "/" in executable:
+        if os.path.isfile(executable) and os.access(executable, os.X_OK):
+            return None
+        return f"Error: `{executable}` executable nahi mila."
+
+    if shutil.which(executable):
+        return None
+    return f"Error: `{executable}` command nahi mila."
+
+
+def command_failed(output):
+    if not output:
+        return False
+    lowered = output.lower()
+    return lowered.startswith("error:") or "command not found" in lowered
+
+
+def has_fallback_provider():
+    return bool(FALLBACK_API_KEY and FALLBACK_MODEL and FALLBACK_BASE_URL)
+
+
+def call_fallback_chat(messages, model, temperature=0.2, max_tokens=600):
+    payload = {
+        "model": FALLBACK_MODEL or model,
+        "messages": messages,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    }
+    data = json.dumps(payload).encode("utf-8")
+    request = urllib.request.Request(
+        FALLBACK_BASE_URL,
+        data=data,
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {FALLBACK_API_KEY}",
+        },
+        method="POST",
+    )
+
+    with urllib.request.urlopen(request, timeout=30) as response:
+        body = json.loads(response.read().decode("utf-8"))
+    return body["choices"][0]["message"]["content"].strip()
 
 
 def summarize_output(output):
@@ -183,6 +285,43 @@ def summarize_output(output):
         return s.get("message", output[:200])
     except Exception:
         return output[:200]
+
+
+def load_news_state():
+    global last_news_titles, last_news_query_signature, last_news_page, last_news_articles
+    try:
+        if not os.path.exists(NEWS_STATE_PATH):
+            return
+        with open(NEWS_STATE_PATH, "r", encoding="utf-8") as file_obj:
+            state = json.load(file_obj)
+        last_news_titles = state.get("last_news_titles", [])
+        last_news_query_signature = state.get("last_news_query_signature")
+        last_news_page = int(state.get("last_news_page", 1))
+        last_news_articles = state.get("last_news_articles", [])
+    except Exception:
+        last_news_titles = []
+        last_news_query_signature = None
+        last_news_page = 1
+        last_news_articles = []
+
+
+def save_news_state():
+    try:
+        os.makedirs(os.path.dirname(NEWS_STATE_PATH), exist_ok=True)
+        with open(NEWS_STATE_PATH, "w", encoding="utf-8") as file_obj:
+            json.dump(
+                {
+                    "last_news_titles": last_news_titles,
+                    "last_news_query_signature": last_news_query_signature,
+                    "last_news_page": last_news_page,
+                    "last_news_articles": last_news_articles,
+                },
+                file_obj,
+                ensure_ascii=True,
+                indent=2,
+            )
+    except Exception:
+        pass
 
 
 def should_use_vision(user_input):
@@ -276,6 +415,109 @@ def get_local_smalltalk_reply(user_input):
     if lowered in night_map:
         return night_map[lowered]
     return None
+
+
+def is_app_launch_request(user_input):
+    lowered = user_input.lower().strip()
+    open_words = ["open", "khol", "khol do", "kholo", "open karo", "open kr"]
+    return any(word in lowered for word in open_words)
+
+
+def extract_requested_app_name(user_input):
+    lowered = user_input.lower().strip()
+    patterns = [
+        (r"^(.*?)\s+(open|khol|khol do|kholo|open karo|open kr)$", 1),
+        (r"^(open|khol|khol do|kholo|open karo|open kr)\s+(.+)$", 2),
+    ]
+    for pattern, group_index in patterns:
+        match = re.search(pattern, lowered)
+        if match:
+            candidate = match.group(group_index)
+            candidate = re.sub(r"\b(app|application)\b", "", candidate).strip()
+            candidate = " ".join(candidate.split())
+            if candidate:
+                return candidate
+    return None
+
+
+def get_app_aliases():
+    return {
+        "terminal": {
+            "label": "Terminal",
+            "commands": ["ptyxis", "gnome-terminal", "kgx", "gnome-console"],
+        },
+        "extensions": {
+            "label": "GNOME Extensions",
+            "commands": ["gnome-control-center extensions"],
+        },
+        "settings": {
+            "label": "Settings",
+            "commands": ["gnome-control-center"],
+        },
+        "files": {
+            "label": "Files",
+            "commands": ["nautilus"],
+        },
+        "file manager": {
+            "label": "Files",
+            "commands": ["nautilus"],
+        },
+        "helvum": {
+            "label": "Helvum",
+            "commands": ["helvum"],
+        },
+        "code": {
+            "label": "VS Code",
+            "commands": ["code"],
+        },
+        "vs code": {
+            "label": "VS Code",
+            "commands": ["code"],
+        },
+        "vscode": {
+            "label": "VS Code",
+            "commands": ["code"],
+        },
+        "calculator": {
+            "label": "Calculator",
+            "commands": ["gnome-calculator"],
+        },
+    }
+
+
+def resolve_app_launch(user_input):
+    requested_app = extract_requested_app_name(user_input)
+    if not requested_app:
+        return None
+
+    aliases = get_app_aliases()
+    alias_key = requested_app
+    if alias_key not in aliases:
+        close_matches = difflib.get_close_matches(alias_key, list(aliases.keys()), n=1, cutoff=0.72)
+        if close_matches:
+            alias_key = close_matches[0]
+        else:
+            return None
+
+    app_info = aliases[alias_key]
+    for command in app_info["commands"]:
+        output = run_command(f"{command} &")
+        if not command_failed(output):
+            return {
+                "requested_app": requested_app,
+                "resolved_key": alias_key,
+                "label": app_info["label"],
+                "command": f"{command} &",
+                "output": output,
+            }
+
+    return {
+        "requested_app": requested_app,
+        "resolved_key": alias_key,
+        "label": app_info["label"],
+        "command": f'{app_info["commands"][0]} &',
+        "output": output,
+    }
 
 
 def is_screenshot_request(user_input):
@@ -451,6 +693,307 @@ def get_local_joke():
     return random.choice(LOCAL_JOKES)
 
 
+def is_news_request(user_input):
+    lowered = user_input.lower().strip()
+    return "news" in lowered or "headlines" in lowered
+
+
+def is_more_news_request(user_input):
+    global last_news_query_signature
+    lowered = user_input.lower().strip()
+    phrases = [
+        "more news", "aur news", "next news", "next headlines",
+        "more headlines", "aur headlines", "dusri news", "doosri news",
+        "agli news"
+    ]
+    short_followups = {"next", "aur", "more", "dusri", "doosri", "agli"}
+    if lowered in short_followups:
+        return bool(last_news_query_signature)
+    return any(phrase in lowered for phrase in phrases)
+
+
+def is_news_summary_request(user_input):
+    lowered = user_input.lower().strip()
+    summary_words = [
+        "summary", "summarize", "explain", "detail", "details",
+        "samjha", "samjhao", "detail mein", "brief", "gist"
+    ]
+    reference_words = [
+        "news", "headline", "article", "pehli", "dusri", "doosri",
+        "teesri", "fourth", "fifth", "first", "second", "third",
+        "1", "2", "3", "4", "5"
+    ]
+    return any(word in lowered for word in summary_words) and (
+        any(word in lowered for word in reference_words) or bool(last_news_articles)
+    )
+
+
+def extract_news_selection_index(user_input, max_items):
+    lowered = user_input.lower().strip()
+    match = re.search(r"\b([1-9])\b", lowered)
+    if match:
+        index = int(match.group(1)) - 1
+        if 0 <= index < max_items:
+            return index
+
+    ordinal_map = {
+        "first": 0,
+        "pehli": 0,
+        "pehla": 0,
+        "1st": 0,
+        "second": 1,
+        "dusri": 1,
+        "doosri": 1,
+        "dusra": 1,
+        "2nd": 1,
+        "third": 2,
+        "teesri": 2,
+        "teesra": 2,
+        "3rd": 2,
+        "fourth": 3,
+        "chauthi": 3,
+        "chautha": 3,
+        "4th": 3,
+        "fifth": 4,
+        "paanchvi": 4,
+        "paanchva": 4,
+        "5th": 4,
+    }
+    for word, index in ordinal_map.items():
+        if word in lowered and index < max_items:
+            return index
+    return 0 if max_items else None
+
+
+def get_news_query_params(user_input):
+    lowered = user_input.lower().strip()
+    params = {"country": "in", "pageSize": "5"}
+
+    categories = {
+        "tech": "technology",
+        "technology": "technology",
+        "sports": "sports",
+        "sport": "sports",
+        "business": "business",
+        "health": "health",
+        "science": "science",
+        "entertainment": "entertainment",
+        "general": "general",
+    }
+
+    countries = {
+        "india": "in",
+        "indian": "in",
+        "us": "us",
+        "usa": "us",
+        "america": "us",
+        "uk": "gb",
+        "britain": "gb",
+    }
+
+    for keyword, category in categories.items():
+        if keyword in lowered:
+            params["category"] = category
+            break
+
+    for keyword, country in countries.items():
+        if keyword in lowered:
+            params["country"] = country
+            break
+
+    query_cleanup = re.sub(
+        r"\b(latest|today|news|headlines|batao|sunao|show|tell me|about|do|de|dena|dijiye|please|plz|more|next|aur|dusri|doosri|agli|second)\b",
+        "",
+        lowered
+    )
+    query_cleanup = " ".join(query_cleanup.split()).strip()
+    if query_cleanup and query_cleanup not in categories and query_cleanup not in countries:
+        params["q"] = query_cleanup
+
+    return params
+
+
+def summarize_news_article(user_input):
+    if not last_news_articles:
+        return "Pehle `news` chalao, phir main selected article ka summary de dunga."
+
+    index = extract_news_selection_index(user_input, len(last_news_articles))
+    if index is None or not (0 <= index < len(last_news_articles)):
+        return "Kaunsi news chahiye woh clear nahi hua. Jaise `1 ka summary` ya `dusri news explain` bolo."
+
+    article = last_news_articles[index]
+    title = article.get("title", "Untitled")
+    source = article.get("source", "Unknown source")
+    description = article.get("description", "")
+    content = article.get("content", "")
+    url = article.get("url", "")
+
+    info_parts = [
+        f"Title: {title}",
+        f"Source: {source}",
+    ]
+    if description:
+        info_parts.append(f"Description: {description}")
+    if content:
+        info_parts.append(f"Content snippet: {content}")
+    if url:
+        info_parts.append(f"URL: {url}")
+    article_context = "\n".join(info_parts)
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You summarize news in short Hinglish. Keep it factual and concise. "
+                "If details are limited, say that clearly. "
+                "Return ONLY plain text, no JSON."
+            )
+        },
+        {
+            "role": "user",
+            "content": (
+                "Is news article ko 3 short lines mein samjhao. "
+                "Line 1: kya hua. Line 2: kyu matter karta hai. "
+                "Line 3: agar context limited ho to mention karo.\n\n"
+                f"{article_context}"
+            )
+        }
+    ]
+
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=messages,
+            temperature=0.2,
+            max_tokens=180
+        )
+        reply = response.choices[0].message.content.strip()
+        return f"{index + 1}. {title} - {source}\n{reply}"
+    except RateLimitError:
+        if has_fallback_provider():
+            try:
+                reply = call_fallback_chat(messages, MODEL, temperature=0.2, max_tokens=180)
+                return f"{index + 1}. {title} - {source}\n{reply}"
+            except Exception:
+                pass
+        return "Abhi summary API limit hit ho gayi hai. Thodi der baad phir try karo."
+    except Exception as e:
+        return f"Summary nahi bana paya: {e}"
+
+
+def fetch_news_headlines(user_input):
+    global last_news_titles, last_news_query_signature, last_news_page, last_news_articles
+    if not NEWS_API_KEY:
+        return "NEWS_API_KEY configured nahi hai. `.env` mein add karo."
+
+    def request_news(params):
+        query_string = urllib.parse.urlencode(params)
+        request = urllib.request.Request(
+            f"{NEWS_API_URL}?{query_string}",
+            headers={"X-Api-Key": NEWS_API_KEY},
+            method="GET",
+        )
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    params = get_news_query_params(user_input)
+    is_more_request = is_more_news_request(user_input)
+    default_params = {"country": "in", "pageSize": "5"}
+    if is_more_request and params == default_params and last_news_query_signature:
+        try:
+            params = json.loads(last_news_query_signature)
+        except Exception:
+            pass
+    query_signature = json.dumps(params, sort_keys=True)
+    target_page = 1
+
+    if is_more_request and last_news_query_signature == query_signature:
+        target_page = last_news_page + 1
+        params["page"] = str(target_page)
+    else:
+        params["page"] = "1"
+
+    fallback_params_list = [params]
+
+    if "q" in params and not is_more_request:
+        without_q = dict(params)
+        without_q.pop("q", None)
+        fallback_params_list.append(without_q)
+
+    if params.get("country") != "us" and not is_more_request:
+        us_fallback = dict(params)
+        us_fallback["country"] = "us"
+        us_fallback.pop("q", None)
+        fallback_params_list.append(us_fallback)
+
+    generic_fallback = {"country": "us", "pageSize": "5", "page": str(target_page)}
+    if not is_more_request and generic_fallback not in fallback_params_list:
+        fallback_params_list.append(generic_fallback)
+
+    articles = []
+    last_error = None
+    for attempt_params in fallback_params_list:
+        try:
+            body = request_news(attempt_params)
+        except urllib.error.HTTPError as e:
+            try:
+                error_body = json.loads(e.read().decode("utf-8"))
+                last_error = f"News API error: {error_body.get('message', str(e))}"
+            except Exception:
+                last_error = f"News API error: {e}"
+            continue
+        except Exception as e:
+            last_error = f"News fetch nahi ho payi: {e}"
+            continue
+
+        fetched_articles = body.get("articles", [])
+        if last_news_titles:
+            filtered_articles = [
+                article for article in fetched_articles
+                if article.get("title") not in last_news_titles
+            ]
+        else:
+            filtered_articles = fetched_articles
+
+        articles = filtered_articles[:5] if filtered_articles else fetched_articles[:5]
+        if articles:
+            last_news_query_signature = json.dumps(
+                {k: v for k, v in attempt_params.items() if k != "page"},
+                sort_keys=True
+            )
+            try:
+                last_news_page = int(attempt_params.get("page", "1"))
+            except ValueError:
+                last_news_page = 1
+            last_news_titles = [article.get("title") for article in articles if article.get("title")]
+            last_news_articles = [
+                {
+                    "title": article.get("title", ""),
+                    "source": article.get("source", {}).get("name", "Unknown source"),
+                    "description": article.get("description", "") or "",
+                    "content": article.get("content", "") or "",
+                    "url": article.get("url", "") or "",
+                }
+                for article in articles
+            ]
+            save_news_state()
+            break
+
+    if not articles:
+        if last_error:
+            return last_error
+        if is_more_request:
+            return "Aur fresh news nahi mili. Nayi category ya country try karo."
+        return "Koi news headlines nahi mili."
+
+    lines = []
+    for index, article in enumerate(articles, start=1):
+        title = article.get("title", "Untitled")
+        source = article.get("source", {}).get("name", "Unknown source")
+        lines.append(f"{index}. {title} - {source}")
+    return "\n".join(lines)
+
+
 def is_api_status_query(user_input):
     lowered = user_input.lower().strip()
     phrases = [
@@ -466,6 +1009,152 @@ def is_open_youtube_request(user_input):
     open_words = ["open", "khol", "khol do", "kholo", "open karo", "open kr"]
     youtube_words = ["youtube", "yt"]
     return any(word in lowered for word in open_words) and any(word in lowered for word in youtube_words)
+
+
+def is_browser_open_request(user_input):
+    lowered = user_input.lower().strip()
+    open_words = ["open", "khol", "khol do", "kholo", "open karo", "open kr"]
+    browser_words = [
+        "browser", "brave", "firefox", "chrome", "google chrome",
+        "web browser"
+    ]
+    return any(word in lowered for word in open_words) and any(word in lowered for word in browser_words)
+
+
+def get_available_browser():
+    for candidate in ["google-chrome", "google-chrome-stable", "brave-browser", "firefox"]:
+        if shutil.which(candidate):
+            return candidate
+    return None
+
+
+def get_browser_for_request(user_input):
+    lowered = user_input.lower().strip()
+    requested_name = None
+    requested_browser = None
+
+    if "firefox" in lowered:
+        requested_name = "Firefox"
+        requested_browser = "firefox"
+    elif "google chrome" in lowered or "chrome" in lowered:
+        requested_name = "Google Chrome"
+        requested_browser = "google-chrome"
+    elif "brave" in lowered:
+        requested_name = "Brave"
+        requested_browser = "brave-browser"
+
+    if requested_browser and shutil.which(requested_browser):
+        return requested_browser, requested_name
+
+    browser = get_available_browser()
+    return browser, requested_name
+
+
+def get_browser_friendly_name(browser):
+    if browser in {"google-chrome", "google-chrome-stable"}:
+        return "Google Chrome"
+    if browser == "brave-browser":
+        return "Brave"
+    if browser == "firefox":
+        return "Firefox"
+    return browser or "Browser"
+
+
+def smart_open_browser(user_input):
+    browser, requested_name = get_browser_for_request(user_input)
+    if not browser:
+        return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
+
+    friendly_name = get_browser_friendly_name(browser)
+
+    run_command(f"{browser} &")
+    if requested_name and requested_name != friendly_name:
+        return f"{requested_name} installed nahi mila, isliye {friendly_name} khol diya."
+    return f"{friendly_name} khol diya."
+
+
+def wants_new_tab(user_input):
+    lowered = user_input.lower().strip()
+    phrases = [
+        "new tab", "naye tab", "naya tab", "dusre tab", "doosre tab",
+        "another tab", "second tab", "alag tab"
+    ]
+    return any(phrase in lowered for phrase in phrases)
+
+
+def get_xdotool_window_ids(search_term, use_class=False):
+    search_flag = "--class" if use_class else "--name"
+    try:
+        result = subprocess.run(
+            f'xdotool search {search_flag} "{search_term}"',
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            env={**os.environ, "DISPLAY": ":0"}
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            return []
+        return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    except Exception:
+        return []
+
+
+def focus_window(window_id):
+    try:
+        subprocess.run(
+            f"xdotool windowmap {window_id} windowactivate {window_id}",
+            shell=True,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            env={**os.environ, "DISPLAY": ":0"}
+        )
+        return True
+    except Exception:
+        return False
+
+
+def smart_open_youtube(user_input):
+    global last_browser_action
+    now = time.monotonic()
+    browser, requested_name = get_browser_for_request(user_input)
+    if not browser:
+        return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
+
+    browser_name = get_browser_friendly_name(browser)
+    if (
+        last_browser_action["target"] == "youtube"
+        and last_browser_action.get("browser") == browser
+        and now - last_browser_action["time"] < 3
+    ):
+        return "YouTube abhi abhi handle kiya tha, isliye dobara open nahi kar raha."
+
+    youtube_window_ids = get_xdotool_window_ids("YouTube")
+    browser_window_ids = get_xdotool_window_ids(browser, use_class=True)
+
+    if wants_new_tab(user_input):
+        run_command(f'{browser} --new-tab "https://youtube.com" &')
+        if browser_window_ids:
+            focus_window(browser_window_ids[-1])
+        last_browser_action = {"target": "youtube", "browser": browser, "time": now}
+        if requested_name and requested_name != browser_name:
+            return f"{requested_name} installed nahi mila, isliye YouTube {browser_name} ke naye tab mein khol diya."
+        return f"YouTube {browser_name} ke naye tab mein khol diya."
+
+    if youtube_window_ids:
+        focus_window(youtube_window_ids[-1])
+        last_browser_action = {"target": "youtube", "browser": browser, "time": now}
+        return f"YouTube pehle se open tha, usi tab ko saamne le aaya."
+
+    run_command(f'{browser} "https://youtube.com" &')
+    updated_browser_window_ids = get_xdotool_window_ids(browser, use_class=True)
+    if updated_browser_window_ids:
+        focus_window(updated_browser_window_ids[-1])
+    last_browser_action = {"target": "youtube", "browser": browser, "time": now}
+    if requested_name and requested_name != browser_name:
+        return f"{requested_name} installed nahi mila, isliye YouTube {browser_name} mein khol diya."
+    return f"YouTube {browser_name} mein khol diya."
 
 
 def save_screenshot_copy(temp_path):
@@ -500,6 +1189,21 @@ def handle_direct_action(user_input):
         print(f"[Xyran] {get_local_joke()}")
         return True
 
+    if is_news_summary_request(lowered):
+        print("[Xyran] News ka summary bana raha hoon...")
+        print(f"[Xyran] {summarize_news_article(user_input)}")
+        return True
+
+    if is_more_news_request(lowered):
+        print("[Xyran] Aur news la raha hoon...")
+        print(f"[Xyran] {fetch_news_headlines(user_input)}")
+        return True
+
+    if is_news_request(lowered):
+        print("[Xyran] News la raha hoon...")
+        print(f"[Xyran] {fetch_news_headlines(user_input)}")
+        return True
+
     if is_api_status_query(lowered):
         if last_rate_limit_wait_text:
             print(f"[Xyran] Abhi nahi, lagbhag {last_rate_limit_wait_text} baad phir try karna.")
@@ -508,13 +1212,31 @@ def handle_direct_action(user_input):
         return True
 
     if is_open_youtube_request(lowered):
-        print("[Xyran] YouTube khol raha hoon")
-        print('[CMD] brave-browser "https://youtube.com" &')
-        output = run_command('brave-browser "https://youtube.com" &')
-        if output and output != "Done.":
-            print(f"[Output] {output}")
-        print("[Xyran] Ho gaya.")
+        print("[Xyran] YouTube handle kar raha hoon")
+        message = smart_open_youtube(user_input)
+        print(f"[Xyran] {message}")
         return True
+
+    if is_browser_open_request(lowered):
+        print("[Xyran] Browser khol raha hoon...")
+        message = smart_open_browser(user_input)
+        print(f"[Xyran] {message}")
+        return True
+
+    if is_app_launch_request(lowered):
+        app_result = resolve_app_launch(user_input)
+        if app_result:
+            print(f"[Xyran] {app_result['label']} khol raha hoon")
+            print(f"[CMD] {app_result['command']}")
+            if app_result["output"] and app_result["output"] != "Done.":
+                print(f"[Output] {app_result['output']}")
+            if command_failed(app_result["output"]):
+                print("[Xyran] Ye app sahi se open nahi hui.")
+            elif app_result["requested_app"] != app_result["resolved_key"]:
+                print(f"[Xyran] `{app_result['requested_app']}` ko `{app_result['label']}` samajh kar khol diya.")
+            else:
+                print("[Xyran] Ho gaya.")
+            return True
 
     if is_rate_limit_time_query(lowered):
         if last_rate_limit_wait_text:
@@ -538,6 +1260,9 @@ def handle_direct_action(user_input):
             output = run_command(open_command)
             if output and output != "Done.":
                 print(f"[Output] {output}")
+                if command_failed(output):
+                    print("[Xyran] File banana ho gaya, lekin editor khul nahi paya.")
+                    return True
 
         if code_to_write:
             print(f"[Xyran] `{code_to_write}` likh diya: {file_path}")
@@ -563,6 +1288,9 @@ def handle_direct_action(user_input):
         output = run_command(f'{editor} "{file_path}" &')
         if output and output != "Done.":
             print(f"[Output] {output}")
+            if command_failed(output):
+                print("[Xyran] File ban gayi, lekin editor khul nahi paya.")
+                return True
 
         if text_to_write:
             print(f"[Xyran] `{text_to_write}` file mein likh diya aur editor khol diya: {file_path}")
@@ -576,7 +1304,10 @@ def handle_direct_action(user_input):
         output = run_command("nautilus &")
         if output and output != "Done.":
             print(f"[Output] {output}")
-        print("[Xyran] Ho gaya.")
+        if not command_failed(output):
+            print("[Xyran] Ho gaya.")
+        else:
+            print("[Xyran] Ye command sahi se run nahi hui.")
         did_something = True
 
     if is_screenshot_request(lowered):
@@ -621,27 +1352,37 @@ def handle_direct_action(user_input):
 
 
 def ask_xyran(user_input, screen_context=None):
+    global last_rate_limit_wait_text, last_provider_used
     content = user_input
     if screen_context:
         content = f"[SCREEN CONTEXT]\n{screen_context}\n\n[USER COMMAND]\n{user_input}"
 
     conversation_history.append({"role": "user", "content": content})
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history
 
     try:
         response = client.chat.completions.create(
             model=MODEL,
-            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history,
+            messages=messages,
             temperature=0.2,
             max_tokens=600
         )
+        last_provider_used = "groq"
     except RateLimitError as e:
+        if has_fallback_provider():
+            try:
+                reply = call_fallback_chat(messages, MODEL, temperature=0.2, max_tokens=600)
+                last_provider_used = "fallback"
+                conversation_history.append({"role": "assistant", "content": reply})
+                return reply
+            except Exception:
+                pass
         wait_match = re.search(r"Please try again in ([0-9hms.]+)", str(e))
         wait_text = humanize_wait_time(wait_match.group(1)) if wait_match else "thodi der"
-        global last_rate_limit_wait_text
         last_rate_limit_wait_text = wait_text
         return json.dumps({
             "action": "answer",
-            "message": f"Groq API ka daily token limit hit ho gaya hai. Lagbhag {wait_text} baad phir try karo, ya direct local commands use karo."
+            "message": f"Groq API ka daily token limit hit ho gaya hai. Lagbhag {wait_text} baad phir try karo, ya direct local commands use karo. Agar fallback provider set hoga to next time auto-switch ho jayega."
         })
 
     reply = response.choices[0].message.content.strip()
@@ -650,6 +1391,7 @@ def ask_xyran(user_input, screen_context=None):
 
 
 def ask_xyran_with_image(user_input, image_path):
+    global last_rate_limit_wait_text, last_provider_used
     with open(image_path, "rb") as f:
         image_data = base64.standard_b64encode(f.read()).decode("utf-8")
 
@@ -696,12 +1438,24 @@ def ask_xyran_with_image(user_input, image_path):
             temperature=0,
             max_tokens=600
         )
+        last_provider_used = "groq"
     except RateLimitError:
-        global last_rate_limit_wait_text
+        if has_fallback_provider():
+            try:
+                reply = call_fallback_chat(
+                    messages,
+                    "meta-llama/llama-4-scout-17b-16e-instruct",
+                    temperature=0,
+                    max_tokens=600
+                )
+                last_provider_used = "fallback"
+                return reply
+            except Exception:
+                pass
         last_rate_limit_wait_text = "thodi der"
         return json.dumps({
             "action": "answer",
-            "message": "Vision API ka token limit hit ho gaya hai, isliye abhi screenshot analyze nahi kar pa raha. Thodi der baad phir try karo."
+            "message": "Vision API ka token limit hit ho gaya hai, isliye abhi screenshot analyze nahi kar pa raha. Thodi der baad phir try karo, ya fallback provider configure karo."
         })
 
     reply = response.choices[0].message.content.strip()
@@ -743,7 +1497,10 @@ def process_response(reply):
                     print(f"\n[Xyran] {summary}")
                 else:
                     print(f"[Output] {output}")
-            print(f"[Xyran] Ho gaya.")
+            if not command_failed(output):
+                print(f"[Xyran] Ho gaya.")
+            else:
+                print(f"[Xyran] Ye command sahi se run nahi hui.")
 
         elif action == "run_multi":
             commands = [
@@ -753,6 +1510,7 @@ def process_response(reply):
             if not commands:
                 print("\n[Xyran] Koi valid commands nahi mile, isliye main kuch run nahi kar raha.")
                 return
+            had_failure = False
             for cmd in commands:
                 print(f"[CMD] {cmd}")
                 output = run_command(cmd)
@@ -762,7 +1520,12 @@ def process_response(reply):
                         print(f"\n[Xyran] {summary}")
                     else:
                         print(f"[Output] {output}")
-            print(f"[Xyran] Sab ho gaya.")
+                if command_failed(output):
+                    had_failure = True
+            if not had_failure:
+                print(f"[Xyran] Sab ho gaya.")
+            else:
+                print(f"[Xyran] Kuch commands sahi se run nahi hui.")
 
         elif action == "answer":
             message = data.get("message", "")
@@ -774,6 +1537,7 @@ def process_response(reply):
 
 def main():
     global last_input_used_vision, vision_followup_turns_left
+    load_news_state()
     print(f"""
 ╔══════════════════════════════════════════╗
 ║         XYRAN AI v2 - ONLINE             ║

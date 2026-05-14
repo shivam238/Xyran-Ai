@@ -4,3 +4,4 @@ Groq-Api-Key.txt
 .env
 venv/
 progress/
+API_KEYS/
