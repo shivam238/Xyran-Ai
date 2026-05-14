@@ -3,3 +3,4 @@ __pycache__/
 Groq-Api-Key.txt
 .env
 venv/
+progress/
