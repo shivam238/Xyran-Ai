@@ -3,11 +3,17 @@ import subprocess
 import json
 import re
 import shutil
+import random
 from datetime import datetime
-from groq import Groq
+from groq import Groq, RateLimitError
 from config import GROQ_API_KEY, MODEL, AI_NAME, USER_NAME
 from vision import analyze_screen, take_screenshot
 import base64
+
+try:
+    import pyjokes
+except Exception:
+    pyjokes = None
 
 client = Groq(api_key=GROQ_API_KEY)
 conversation_history = []
@@ -15,6 +21,16 @@ last_input_used_vision = False
 vision_followup_turns_left = 0
 last_screenshot_path = None
 last_editor_file_path = None
+last_created_code_file = None
+last_rate_limit_wait_text = None
+
+LOCAL_JOKES = [
+    "Programmer ne paani kyu nahi piya? Kyunki usne socha bug liquid state mein bhi ho sakta hai.",
+    "Ek coder bola: meri life sorted hai. Phir usne semicolon miss kar diya.",
+    "Debugging wahi process hai jahan hum detective bhi hote hain aur criminal bhi.",
+    "Computer ko thand kyu lag gayi? Kyunki usne Windows khuli chhod di.",
+    "Code itna clean tha ki bug ko rehne ke liye alag room lena pada."
+]
 
 SYSTEM_PROMPT = f"""You are {AI_NAME}, a powerful personal AI agent on {USER_NAME}'s Fedora Linux + GNOME + Wayland system.
 You also have VISION — you can see the screen via screenshots.
@@ -209,6 +225,59 @@ def is_ambiguous_short_followup(user_input):
     return word_count <= 5 and any(phrase in lowered for phrase in ambiguous_phrases)
 
 
+def is_acknowledgement(user_input):
+    lowered = user_input.lower().strip()
+    acknowledgements = {
+        "ok", "okay", "okk", "k", "kk", "haan", "hm", "hmm", "hmmm",
+        "thanks", "thank you", "thx", "theek", "theek hai", "achha",
+        "acha", "nice", "good", "great", "cool"
+    }
+    return lowered in acknowledgements
+
+
+def is_greeting(user_input):
+    lowered = user_input.lower().strip()
+    if lowered in {"yo", "namaste", "salam"}:
+        return True
+    compact = re.sub(r"(.)\1+", r"\1", lowered)
+    return compact in {"hi", "hello", "hey"}
+
+
+def get_local_smalltalk_reply(user_input):
+    lowered = user_input.lower().strip()
+
+    farewell_map = {
+        "bye": "Theek hai, phir milte hain.",
+        "goodbye": "Theek hai, phir milte hain.",
+        "good bye": "Theek hai, phir milte hain.",
+        "milte hain": "Theek hai, phir milte hain.",
+        "phir milte hain": "Theek hai, phir milte hain.",
+        "see you": "Theek hai, phir milte hain.",
+        "cya": "Theek hai, phir milte hain.",
+    }
+    thanks_map = {
+        "shukriya": "Khushi hui help karke.",
+        "dhanyawad": "Khushi hui help karke.",
+        "dhanyavaad": "Khushi hui help karke.",
+        "thanku": "Khushi hui help karke.",
+        "thank u": "Khushi hui help karke.",
+        "ty": "Khushi hui help karke.",
+    }
+    night_map = {
+        "good night": "Good night. Aaram se rest karo.",
+        "gn": "Good night. Aaram se rest karo.",
+        "night": "Good night. Aaram se rest karo.",
+    }
+
+    if lowered in farewell_map:
+        return farewell_map[lowered]
+    if lowered in thanks_map:
+        return thanks_map[lowered]
+    if lowered in night_map:
+        return night_map[lowered]
+    return None
+
+
 def is_screenshot_request(user_input):
     lowered = user_input.lower()
     screenshot_words = ["screenshot", "screen shot", "ss le", "ss lo", "capture screen"]
@@ -235,6 +304,13 @@ def is_text_editor_request(user_input):
     return any(word in lowered for word in editor_words) and (
         any(word in lowered for word in open_words) or any(word in lowered for word in write_words)
     )
+
+
+def is_python_file_request(user_input):
+    lowered = user_input.lower()
+    create_words = ["new", "banao", "bnao", "create", "bana do", "bna do"]
+    python_words = ["py file", "python file", ".py"]
+    return any(word in lowered for word in create_words) and any(word in lowered for word in python_words)
 
 
 def extract_text_to_write(user_input):
@@ -293,6 +369,105 @@ def prepare_editor_file(initial_text=None):
     return file_path
 
 
+def prepare_python_file(initial_code=None):
+    global last_created_code_file
+    folder = os.path.expanduser(f"~/Documents/{AI_NAME}")
+    os.makedirs(folder, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    file_path = os.path.join(folder, f"script-{timestamp}.py")
+    with open(file_path, "w", encoding="utf-8") as file_obj:
+        if initial_code:
+            file_obj.write(initial_code)
+            if not initial_code.endswith("\n"):
+                file_obj.write("\n")
+    last_created_code_file = file_path
+    return file_path
+
+
+def extract_python_code_request(user_input):
+    lowered = user_input.lower()
+    if "hello print" in lowered or "print hello" in lowered:
+        return 'print("hello")'
+    if "hello world print" in lowered or "print hello world" in lowered:
+        return 'print("hello world")'
+    return None
+
+
+def get_editor_open_command(file_path):
+    editor = shutil.which("code")
+    if editor:
+        return f'code "{file_path}" &'
+    editor = get_available_text_editor()
+    if editor:
+        return f'{editor} "{file_path}" &'
+    return None
+
+
+def humanize_wait_time(wait_text):
+    normalized = re.sub(r"(\d+)\.\d+s", r"\1s", wait_text.lower())
+    parts = re.findall(r"(\d+)([hms])", normalized)
+    if not parts:
+        return wait_text
+
+    labels = {"h": "hour", "m": "minute", "s": "second"}
+    human_parts = []
+    for value, unit in parts:
+        label = labels[unit]
+        if value != "1":
+            label += "s"
+        human_parts.append(f"{value} {label}")
+    return " ".join(human_parts)
+
+
+def is_rate_limit_time_query(user_input):
+    lowered = user_input.lower().strip()
+    phrases = [
+        "kitna time bacha hai",
+        "kitna wait hai",
+        "kab tak wait",
+        "kab tak rukna hai",
+        "how much time left",
+        "time left",
+        "kitni der baaki hai",
+    ]
+    return any(phrase in lowered for phrase in phrases)
+
+
+def is_joke_request(user_input):
+    lowered = user_input.lower().strip()
+    phrases = [
+        "tell me a joke", "joke suna", "joke sunao", "koi joke",
+        "majak suna", "funny bol", "hasao", "make me laugh"
+    ]
+    return any(phrase in lowered for phrase in phrases)
+
+
+def get_local_joke():
+    if pyjokes:
+        try:
+            return pyjokes.get_joke()
+        except Exception:
+            pass
+    return random.choice(LOCAL_JOKES)
+
+
+def is_api_status_query(user_input):
+    lowered = user_input.lower().strip()
+    phrases = [
+        "api aa gya hai", "api aa gaya hai", "api aagya hai",
+        "api back hai", "api wapas aayi", "api chal rahi hai",
+        "is api back", "api back"
+    ]
+    return any(phrase in lowered for phrase in phrases)
+
+
+def is_open_youtube_request(user_input):
+    lowered = user_input.lower().strip()
+    open_words = ["open", "khol", "khol do", "kholo", "open karo", "open kr"]
+    youtube_words = ["youtube", "yt"]
+    return any(word in lowered for word in open_words) and any(word in lowered for word in youtube_words)
+
+
 def save_screenshot_copy(temp_path):
     timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
     folder = os.path.expanduser(f"~/Pictures/{AI_NAME}-Screenshots")
@@ -303,10 +478,72 @@ def save_screenshot_copy(temp_path):
 
 
 def handle_direct_action(user_input):
-    global last_screenshot_path
+    global last_screenshot_path, last_rate_limit_wait_text
     lowered = user_input.lower().strip()
 
     did_something = False
+
+    if is_acknowledgement(lowered):
+        print("[Xyran] Theek hai.")
+        return True
+
+    if is_greeting(lowered):
+        print("[Xyran] Hello! Kya help chahiye?")
+        return True
+
+    smalltalk_reply = get_local_smalltalk_reply(lowered)
+    if smalltalk_reply:
+        print(f"[Xyran] {smalltalk_reply}")
+        return True
+
+    if is_joke_request(lowered):
+        print(f"[Xyran] {get_local_joke()}")
+        return True
+
+    if is_api_status_query(lowered):
+        if last_rate_limit_wait_text:
+            print(f"[Xyran] Abhi nahi, lagbhag {last_rate_limit_wait_text} baad phir try karna.")
+        else:
+            print("[Xyran] Haan, abhi try karke dekh sakte ho.")
+        return True
+
+    if is_open_youtube_request(lowered):
+        print("[Xyran] YouTube khol raha hoon")
+        print('[CMD] brave-browser "https://youtube.com" &')
+        output = run_command('brave-browser "https://youtube.com" &')
+        if output and output != "Done.":
+            print(f"[Output] {output}")
+        print("[Xyran] Ho gaya.")
+        return True
+
+    if is_rate_limit_time_query(lowered):
+        if last_rate_limit_wait_text:
+            print(f"[Xyran] Lagbhag {last_rate_limit_wait_text} baad phir try kar sakte ho.")
+        else:
+            print("[Xyran] Abhi mere paas exact wait time saved nahi hai.")
+        return True
+
+    if is_python_file_request(lowered):
+        code_to_write = extract_python_code_request(user_input)
+        file_path = prepare_python_file(code_to_write)
+        open_command = get_editor_open_command(file_path)
+
+        if code_to_write:
+            print("[Xyran] Nayi Python file bana raha hoon aur code likh raha hoon")
+        else:
+            print("[Xyran] Nayi Python file bana raha hoon")
+
+        if open_command:
+            print(f"[CMD] {open_command}")
+            output = run_command(open_command)
+            if output and output != "Done.":
+                print(f"[Output] {output}")
+
+        if code_to_write:
+            print(f"[Xyran] `{code_to_write}` likh diya: {file_path}")
+        else:
+            print(f"[Xyran] Python file bana di: {file_path}")
+        return True
 
     if is_text_editor_request(lowered):
         editor = get_available_text_editor()
@@ -390,12 +627,22 @@ def ask_xyran(user_input, screen_context=None):
 
     conversation_history.append({"role": "user", "content": content})
 
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history,
-        temperature=0.2,
-        max_tokens=600
-    )
+    try:
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[{"role": "system", "content": SYSTEM_PROMPT}] + conversation_history,
+            temperature=0.2,
+            max_tokens=600
+        )
+    except RateLimitError as e:
+        wait_match = re.search(r"Please try again in ([0-9hms.]+)", str(e))
+        wait_text = humanize_wait_time(wait_match.group(1)) if wait_match else "thodi der"
+        global last_rate_limit_wait_text
+        last_rate_limit_wait_text = wait_text
+        return json.dumps({
+            "action": "answer",
+            "message": f"Groq API ka daily token limit hit ho gaya hai. Lagbhag {wait_text} baad phir try karo, ya direct local commands use karo."
+        })
 
     reply = response.choices[0].message.content.strip()
     conversation_history.append({"role": "assistant", "content": reply})
@@ -442,12 +689,20 @@ def ask_xyran_with_image(user_input, image_path):
         }
     ]
 
-    response = client.chat.completions.create(
-        model="meta-llama/llama-4-scout-17b-16e-instruct",
-        messages=messages,
-        temperature=0,
-        max_tokens=600
-    )
+    try:
+        response = client.chat.completions.create(
+            model="meta-llama/llama-4-scout-17b-16e-instruct",
+            messages=messages,
+            temperature=0,
+            max_tokens=600
+        )
+    except RateLimitError:
+        global last_rate_limit_wait_text
+        last_rate_limit_wait_text = "thodi der"
+        return json.dumps({
+            "action": "answer",
+            "message": "Vision API ka token limit hit ho gaya hai, isliye abhi screenshot analyze nahi kar pa raha. Thodi der baad phir try karo."
+        })
 
     reply = response.choices[0].message.content.strip()
     return reply
@@ -568,6 +823,10 @@ def main():
         except KeyboardInterrupt:
             print("\n[Xyran] Band ho raha hoon.")
             break
+        except RateLimitError:
+            print("\n[Xyran] Groq API rate limit hit ho gaya hai. Thodi der baad phir try karo.")
+        except Exception as e:
+            print(f"\n[Xyran] Error aaya: {e}")
 
 
 if __name__ == "__main__":
