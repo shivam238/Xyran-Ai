@@ -2,6 +2,7 @@ import os
 import re
 import time
 from datetime import datetime
+from modules.image_gen.handler import handle_image
 
 from config import AI_NAME
 from vision import take_screenshot
@@ -115,16 +116,31 @@ def should_write_last_answer(user_input, extracted_text, runtime_state):
 def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module, run_command, command_failed, ai=None):
     lowered = user_input.lower().strip()
     did_something = False
+
+    # FLAGS FIRST (IMPORTANT)
     screenshot_requested = is_screenshot_request(lowered)
     text_editor_requested = is_text_editor_request(lowered)
     compound_requested = has_action_connector(lowered)
-    continue_after_action = screenshot_requested or compound_requested
+
     search_query = extract_web_search_query(user_input)
     search_requested = bool(search_query)
     search_handles_browser_open = search_requested and search_consumes_open_phrase(user_input)
+
     known_website = resolve_known_website(user_input)
+
+    # NOW SAFE TO DEFINE THIS
+    continue_after_action = screenshot_requested or compound_requested
+
     youtube_handled = False
     search_handled = False
+
+    # IMAGE GENERATION (NEW MODULE)
+    image_result = handle_image(user_input, AI_NAME)
+    if image_result:
+        print(image_result)
+        did_something = True
+        if not continue_after_action:
+            return True
 
     if is_acknowledgement(lowered):
         print("[Xyran] Theek hai.")
