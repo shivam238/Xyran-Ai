@@ -18,9 +18,8 @@ COMMON_CHITCHAT = {
 }
 
 MEMORY_TRIGGER_WORDS = {
-    "yaad", "pehle", "kya", "pasand", "remember", "past", "history", "pata", "know", 
-    "recall", "naam", "age", "umar", "did", "previous", "food", "khana", "khaya", 
-    "drink", "peena", "choice", "secret", "code", "personal"
+    "yaad", "pehle", "pasand", "remember", "past", "history", 
+    "recall", "previous", "choice", "secret", "code", "personal"
 }
 
 
@@ -49,7 +48,9 @@ def get_model():
             pass
         from sentence_transformers import SentenceTransformer
         # Load model lazily so CLI startup remains fast
+        print(">>> MODEL LOADING ONCE 🚀")
         _model = SentenceTransformer('all-MiniLM-L6-v2')
+        print(">>> MODEL LOADED ✅")
     return _model
 
 

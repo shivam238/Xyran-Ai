@@ -1,10 +1,6 @@
 import os
-
+from xyran_memory import remember, recall
 from groq import Groq, RateLimitError
-from memory_db import init_db, insert_memory
-from vector_memory import build_index, search_memory
-from memory_extractor import extract_memory
-from xyran_memory import format_memory_for_ai
 from config import (
     AI_NAME,
     AI_PROVIDER_MODE,
@@ -77,8 +73,6 @@ news_manager = NewsManager(
 
 
 def main():
-    init_db()
-    build_index()
     news_manager.load_state()
     print(f"""
 ╔══════════════════════════════════════════╗
@@ -98,30 +92,6 @@ def main():
                 print("[Xyran] Theek hai. Phir milenge.")
                 break
 
-            # Dynamic self-learning memory feedback reinforcement check
-            from xyran_neural_memory import detect_feedback, update_memory_rating
-            fb_score = detect_feedback(user_input)
-            if fb_score != 0 and runtime_state.last_retrieved_memory_text:
-                update_memory_rating(runtime_state.last_retrieved_memory_text, fb_score)
-                print(f"[{AI_NAME}] Self-learning update: Memory reinforced with score delta {fb_score}!")
-                runtime_state.last_retrieved_memory_text = None
-
-            if user_input.lower().startswith("remember "):
-                content = user_input[9:].strip()
-                insert_memory("facts", content)
-                build_index()
-                print(f"[{AI_NAME}] Yaad rakh liya: {content}")
-                continue
-
-            # --- XYRAN BRAIN V3 ---
-            from xyran_brain import brain
-            brain_result = brain(user_input, runtime_state)
-            if brain_result:
-                print(f"[{AI_NAME}] {brain_result}")
-                continue
-
-            extract_memory(user_input)
-
             if handle_direct_action(user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai):
                 runtime_state.last_input_used_vision = False
                 continue
@@ -132,54 +102,22 @@ def main():
                 or (runtime_state.vision_followup_turns_left > 0 and is_ambiguous_short_followup(user_input))
             )
 
-            from xyran_neural_memory import search_neural_memory, add_neural_memory, is_chitchat_or_short, should_trigger_memory
-
-            neural_matches = []
-            if not is_chitchat_or_short(user_input) and should_trigger_memory(user_input):
-                neural_matches = search_neural_memory(user_input, k=3)
-                if neural_matches:
-                    runtime_state.last_retrieved_memory_text = neural_matches[0]
-
-            neural_context = ""
-            if neural_matches:
-                neural_context = "SEMANTIC PAST CONVERSATIONS:\n" + "\n".join(f"- {m}" for m in neural_matches)
-
-            memory_context = format_memory_for_ai()
-
-            # Update system prompt dynamically if memory exists
-            prompt_ext = []
-            if memory_context:
-                prompt_ext.append("FACTS / PREFERENCES:\n" + memory_context)
-            if neural_context:
-                prompt_ext.append(neural_context)
-
-            if prompt_ext:
-                ai.system_prompt = SYSTEM_PROMPT + "\n\n" + "\n\n".join(prompt_ext)
-            else:
-                ai.system_prompt = SYSTEM_PROMPT
-
-            full_input = user_input
-
             if use_vision:
                 print("[Xyran] Screen dekh raha hoon...")
                 img_path, err = take_screenshot()
                 if img_path:
-                    reply = ai.ask_with_image(full_input, img_path)
+                    reply = ai.ask_with_image(user_input, img_path)
                     os.remove(img_path)
                 else:
                     print(f"[Xyran] Screenshot nahi le paya: {err}")
-                    reply = ai.ask(full_input)
+                    reply = ai.ask(user_input)
                 runtime_state.last_input_used_vision = True
                 runtime_state.vision_followup_turns_left = 2
             else:
-                reply = ai.ask(full_input)
+                reply = ai.ask(user_input)
                 runtime_state.last_input_used_vision = False
                 if runtime_state.vision_followup_turns_left > 0:
                     runtime_state.vision_followup_turns_left -= 1
-
-            if reply and not is_chitchat_or_short(user_input):
-                # Save the successful chat context to FAISS vector memory
-                add_neural_memory(f"User asked: {user_input} -> Xyran replied: {reply}")
 
             process_response(reply, run_command, command_failed, ai.summarize_output, clean_json, runtime_state)
 

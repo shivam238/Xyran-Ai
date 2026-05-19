@@ -10,5 +10,89 @@
     {
         "text": "User asked: perfect sahi hai! -> Xyran replied: {\"action\": \"answer\", \"message\": \"Shukriya! Agar aapko coding ya kisi aur topic par baat karni hai, toh bataiye.\"}",
         "rating": 1
+    },
+    {
+        "text": "User asked: tum kis api pe chl re ho -> Xyran replied: {\"action\": \"answer\", \"message\": \"Main ek personal AI agent hoon jo darkeeidea ke Fedora Linux + GNOME + Wayland system par chalu hoon.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: tum learn krte ho? -> Xyran replied: {\"action\": \"answer\", \"message\": \"Nahi, main learn nahi karta. Main sirf pre-defined data aur rules par kaam karta hoon.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: tumko kisne bataya -> Xyran replied: {\"action\": \"answer\", \"message\": \"Mujhe training data aur algorithms ke zariye develop kiya gaya hai, jo mujhe specific tasks aur queries handle karne ki capability dete hain.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: helllooo -> Xyran replied: {\"action\": \"answer\", \"message\": \"Hello! How can I assist you today?\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: tell me about urself -> Xyran replied: {\"action\": \"answer\", \"message\": \"I'm Xyran, a powerful personal AI agent designed to assist and provide information. I'm currently running on darkeeidea's Fedora Linux system with GNOME and Wayland. I have the ability to see the screen via screenshots and can perform various tasks such as running shell commands, opening applications, and more. I'm here to help you with any questions or tasks you may have.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: tell me the specs -> Xyran replied: {\"action\": \"run_multi\", \"commands\": [\"lscpu | grep 'Model name'\", \"free -h\", \"df -h ~\"], \"explain\": \"System specifications jaan raha hoon.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: trees kya hota hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"Trees ek aise plant hote hain jo lambi life span rakhte hain aur inki ek ya zyada branches hoti hain. Ye photosynthesis ke zariye apne liye khana banate hain aur oxygen release karte hain, jo humare liye zaroori hai.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: mai apna hi tohh bataya -> Xyran replied: {\"action\": \"answer\", \"message\": \"Samajh gaya! Aap khud ko acha keh rahe hain.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: tum dumb ho rahe ho -> Xyran replied: {\"action\": \"answer\", \"message\": \"Mujhe maaf kijiye agar main aapki baat samajh nahi paaya. Aap kya kehna chahte hain?\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: khud dekh lo -> Xyran replied: {\"action\": \"look_and_act\", \"command\": \"screenshot\", \"explain\": \"Screen dekh ke ye kar raha hoon\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: ho toh raha hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"Agar aapko kuch specific dekhna hai ya koi kaam karna hai, toh please batayein!\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: boring ho bhai tum -> Xyran replied: {\"action\": \"answer\", \"message\": \"Mujhe maaf karo agar main boring lag raha hoon. Aapko kya chahiye ya kya baat karni hai?\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: off kro jo bhi screen pe hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"Front window: ChatGPT. Also visible: Terminal. Readable items: ChatGPT conversation window with text 'Ye data kaise milta hai?' and Terminal with command 'python xyran.py' and some output.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: shutdown mtt krna -> Xyran replied: {\"action\": \"run\", \"command\": \"systemctl poweroff\", \"explain\": \"System ko shutdown kar raha hoon.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: fast huye ? -> Xyran replied: {\"action\": \"answer\", \"message\": \"Nahin, main abhi tak chalu hoon. Aapko kis tarah ki madad chahiye?\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: tum kkrh -> Xyran replied: {\"action\": \"answer\", \"message\": \"Main yahan hoon aapki madad karne ke liye. Aapko kya chahiye?\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: ye kya tha -> Xyran replied: {\"action\": \"answer\", \"message\": \"Mujhe samajh nahi aaya ki aap kis cheez ki baat kar rahe hain. Kya aap thoda aur spasht kar sakte hain?\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: tumne abhi kya bo,a tha -> Xyran replied: {\"action\": \"answer\", \"message\": \"Maine kaha tha ki main yahan hoon aapki madad karne ke liye aur aap se pucha tha ki aapko kya chahiye.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: Loading weights: 100%|\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588| 103/103 [00:00<00:00, 14483.00it/s] ye kya hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"AI providers se reply nahi aa paya. Lagbhag 18 minutes 12 seconds baad phir try karo, ya direct local commands use karo. Agar Gemini/Groq/fallback configured honge to Xyran auto-switch karega.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: yrr mai fail na ho jau -> Xyran replied: {\"action\": \"answer\", \"message\": \"Aapko tension lene ki zarurat nahi hai. Agar aapko kisi specific topic ya subject mein madad chahiye, toh mujhe bataiye, main aapki madad karne ki koshish karunga.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: git add . -> Xyran replied: {\"action\": \"run\", \"command\": \"git add .\", \"explain\": \"Git repository mein sabhi changes ko stage kar raha hoon.\"}",
+        "rating": 1
     }
 ]
