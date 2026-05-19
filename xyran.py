@@ -124,10 +124,10 @@ def main():
                 or (runtime_state.vision_followup_turns_left > 0 and is_ambiguous_short_followup(user_input))
             )
 
-            from xyran_neural_memory import search_neural_memory, add_neural_memory, is_chitchat_or_short
+            from xyran_neural_memory import search_neural_memory, add_neural_memory, is_chitchat_or_short, should_trigger_memory
 
             neural_matches = []
-            if not is_chitchat_or_short(user_input):
+            if not is_chitchat_or_short(user_input) and should_trigger_memory(user_input):
                 neural_matches = search_neural_memory(user_input, k=3)
 
             neural_context = ""

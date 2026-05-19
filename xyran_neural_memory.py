@@ -17,6 +17,12 @@ COMMON_CHITCHAT = {
     "kya", "kyu", "kyon", "kab", "kahan", "kaise", "aur", "and", "or", "what", "who", "why"
 }
 
+MEMORY_TRIGGER_WORDS = {
+    "yaad", "pehle", "kya", "pasand", "remember", "past", "history", "pata", "know", 
+    "recall", "naam", "age", "umar", "did", "previous", "food", "khana", "khaya", 
+    "drink", "peena", "choice", "secret", "code", "personal"
+}
+
 
 def is_chitchat_or_short(text):
     clean = text.lower().strip()
@@ -26,6 +32,11 @@ def is_chitchat_or_short(text):
     if words.issubset(COMMON_CHITCHAT):
         return True
     return False
+
+
+def should_trigger_memory(text):
+    text_clean = text.lower().strip()
+    return any(w in text_clean for w in MEMORY_TRIGGER_WORDS)
 
 
 def get_model():
@@ -61,23 +72,30 @@ def ensure_neural_memory():
             _memory_store = []
 
 
-def add_neural_memory(text):
+def add_neural_memory(text, rating=1):
     global _index, _memory_store
     ensure_neural_memory()
     text = text.strip()
     if not text:
         return
 
-    # Avoid duplicate exact memories
-    if text in _memory_store:
-        return
+    # Boost rating on repetition
+    for item in _memory_store:
+        item_text = item["text"] if isinstance(item, dict) else item
+        if item_text == text:
+            if isinstance(item, dict):
+                item["rating"] = item.get("rating", 1) + 1
+                # Save changes
+                with open(META_FILE, "w") as f:
+                    json.dump(_memory_store, f, indent=4)
+            return
 
     model = get_model()
     embedding = model.encode(text)
     vec = np.array([embedding]).astype('float32')
 
     _index.add(vec)
-    _memory_store.append(text)
+    _memory_store.append({"text": text, "rating": rating})
 
     # Save persistently to disk
     faiss.write_index(_index, INDEX_FILE)
@@ -98,9 +116,15 @@ def search_neural_memory(query, k=3):
     k = min(k, len(_memory_store))
     distances, indices = _index.search(q_vec, k)
 
-    results = []
+    matched_items = []
     for idx in indices[0]:
         if 0 <= idx < len(_memory_store):
-            results.append(_memory_store[idx])
+            item = _memory_store[idx]
+            if isinstance(item, str):
+                item = {"text": item, "rating": 1}
+            matched_items.append(item)
 
-    return results
+    # Sort matches by dynamic feedback/repetition rating
+    matched_items.sort(key=lambda x: x.get("rating", 1), reverse=True)
+
+    return [item["text"] for item in matched_items]

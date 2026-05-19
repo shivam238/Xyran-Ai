@@ -1,4 +1,14 @@
 [
-    "User asked: mujhe paneer tikka aur butter naan khana pasand hai -> Xyran replied: {\"action\": \"remember\", \"data\": \"User likes to eat paneer tikka and butter naan.\"}",
-    "User asked: ek baat bata -> Xyran replied: {\"action\": \"answer\", \"message\": \"Haan, puchiye. Kya jaanna chahte hain aap?\"}"
+    {
+        "text": "User asked: mujhe paneer tikka aur butter naan khana pasand hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"Achha, aapko paneer tikka aur butter naan pasand hai. Bahut badhiya!\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: aaj bahar bahut achha lag raha hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"Haan, aaj mausam bahut suhana lag raha hai.\"}",
+        "rating": 1
+    },
+    {
+        "text": "User asked: mujhe khana kya pasand hai? -> Xyran replied: {\"action\": \"answer\", \"message\": \"Aapko paneer tikka aur butter naan khana pasand hai.\"}",
+        "rating": 1
+    }
 ]
