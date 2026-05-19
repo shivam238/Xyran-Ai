@@ -128,3 +128,29 @@ def search_neural_memory(query, k=3):
     matched_items.sort(key=lambda x: x.get("rating", 1), reverse=True)
 
     return [item["text"] for item in matched_items]
+
+
+def detect_feedback(text):
+    text_clean = text.lower().strip()
+    # Positive feedback indicators
+    if any(w in text_clean for w in ["good", "nice", "perfect", "sahi", "sahi hai", "thank you", "dhanyavad", "shukriya", "correct", "helpful", "great"]):
+        return 1.0
+    # Negative feedback indicators
+    if any(w in text_clean for w in ["bad", "wrong", "galat", "useless", "incorrect", "poor", "bekar"]):
+        return -1.0
+    return 0.0
+
+
+def update_memory_rating(memory_text, score_delta):
+    global _memory_store
+    ensure_neural_memory()
+    for item in _memory_store:
+        item_text = item["text"] if isinstance(item, dict) else item
+        if item_text == memory_text:
+            if isinstance(item, dict):
+                # Update dynamic reinforcement score
+                item["rating"] = round(item.get("rating", 1.0) + score_delta, 2)
+                # Persist to disk
+                with open(META_FILE, "w") as f:
+                    json.dump(_memory_store, f, indent=4)
+            break

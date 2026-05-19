@@ -15,4 +15,5 @@ class RuntimeState:
     last_browser_action: dict = field(default_factory=lambda: {"target": None, "time": 0.0})
     pending_name: str | None = None
     pending_age: str | None = None
+    last_retrieved_memory_text: str | None = None
 

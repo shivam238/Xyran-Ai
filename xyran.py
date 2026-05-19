@@ -98,6 +98,14 @@ def main():
                 print("[Xyran] Theek hai. Phir milenge.")
                 break
 
+            # Dynamic self-learning memory feedback reinforcement check
+            from xyran_neural_memory import detect_feedback, update_memory_rating
+            fb_score = detect_feedback(user_input)
+            if fb_score != 0 and runtime_state.last_retrieved_memory_text:
+                update_memory_rating(runtime_state.last_retrieved_memory_text, fb_score)
+                print(f"[{AI_NAME}] Self-learning update: Memory reinforced with score delta {fb_score}!")
+                runtime_state.last_retrieved_memory_text = None
+
             if user_input.lower().startswith("remember "):
                 content = user_input[9:].strip()
                 insert_memory("facts", content)
@@ -129,6 +137,8 @@ def main():
             neural_matches = []
             if not is_chitchat_or_short(user_input) and should_trigger_memory(user_input):
                 neural_matches = search_neural_memory(user_input, k=3)
+                if neural_matches:
+                    runtime_state.last_retrieved_memory_text = neural_matches[0]
 
             neural_context = ""
             if neural_matches:

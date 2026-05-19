@@ -1,14 +1,14 @@
 [
     {
-        "text": "User asked: mujhe paneer tikka aur butter naan khana pasand hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"Achha, aapko paneer tikka aur butter naan pasand hai. Bahut badhiya!\"}",
+        "text": "User asked: mujhe coding karna pasand hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"Yeh bahut acchi baat hai! Coding ek creative aur problem-solving skill hai. Aap kis programming language mein coding karna pasand karte hain?\"}",
+        "rating": 2.0
+    },
+    {
+        "text": "User asked: mujhe kya pasand hai? -> Xyran replied: {\"action\": \"answer\", \"message\": \"Aapne pehle bataya tha ki aapko coding karna pasand hai.\"}",
         "rating": 1
     },
     {
-        "text": "User asked: aaj bahar bahut achha lag raha hai -> Xyran replied: {\"action\": \"answer\", \"message\": \"Haan, aaj mausam bahut suhana lag raha hai.\"}",
-        "rating": 1
-    },
-    {
-        "text": "User asked: mujhe khana kya pasand hai? -> Xyran replied: {\"action\": \"answer\", \"message\": \"Aapko paneer tikka aur butter naan khana pasand hai.\"}",
+        "text": "User asked: perfect sahi hai! -> Xyran replied: {\"action\": \"answer\", \"message\": \"Shukriya! Agar aapko coding ya kisi aur topic par baat karni hai, toh bataiye.\"}",
         "rating": 1
     }
 ]
