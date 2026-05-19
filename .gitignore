@@ -1,27 +1,30 @@
-# Python cache
+# Python
 __pycache__/
-*.py[cod]
+*.pyc
+*.pyo
+*.pyd
 
-# Virtual environments
+# Environment
+.env
 .venv/
 venv/
-env/
 
-# Local environment files
-.env
+# IDE
+.vscode/
+.idea/
 
-# Tooling caches
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-
-# Project-local state / secrets
-.xyran_news_state.json
-API_KEYS/
-
-# Local Codex metadata
-.agents/
-.codex/
-
-# OS / editor noise
+# OS
 .DS_Store
+
+# Logs
+*.log
+
+# Database / local memory (IMPORTANT for your project)
+memory/memory.db
+memory/*.db
+
+# Temporary files
+*.tmp
+
+# Cache
+.cache/
