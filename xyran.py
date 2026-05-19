@@ -124,11 +124,27 @@ def main():
                 or (runtime_state.vision_followup_turns_left > 0 and is_ambiguous_short_followup(user_input))
             )
 
+            from xyran_neural_memory import search_neural_memory, add_neural_memory, is_chitchat_or_short
+
+            neural_matches = []
+            if not is_chitchat_or_short(user_input):
+                neural_matches = search_neural_memory(user_input, k=3)
+
+            neural_context = ""
+            if neural_matches:
+                neural_context = "SEMANTIC PAST CONVERSATIONS:\n" + "\n".join(f"- {m}" for m in neural_matches)
+
             memory_context = format_memory_for_ai()
 
             # Update system prompt dynamically if memory exists
+            prompt_ext = []
             if memory_context:
-                ai.system_prompt = SYSTEM_PROMPT + "\n\nMEMORY:\n" + memory_context
+                prompt_ext.append("FACTS / PREFERENCES:\n" + memory_context)
+            if neural_context:
+                prompt_ext.append(neural_context)
+
+            if prompt_ext:
+                ai.system_prompt = SYSTEM_PROMPT + "\n\n" + "\n\n".join(prompt_ext)
             else:
                 ai.system_prompt = SYSTEM_PROMPT
 
@@ -150,6 +166,10 @@ def main():
                 runtime_state.last_input_used_vision = False
                 if runtime_state.vision_followup_turns_left > 0:
                     runtime_state.vision_followup_turns_left -= 1
+
+            if reply and not is_chitchat_or_short(user_input):
+                # Save the successful chat context to FAISS vector memory
+                add_neural_memory(f"User asked: {user_input} -> Xyran replied: {reply}")
 
             process_response(reply, run_command, command_failed, ai.summarize_output, clean_json, runtime_state)
 

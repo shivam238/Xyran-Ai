@@ -1,12 +1,5 @@
 {
-    "facts": {
-        "name": {
-            "value": "Shivam"
-        },
-        "age": {
-            "value": "18"
-        }
-    },
+    "facts": {},
     "preferences": [],
     "tasks": [],
     "projects": []
