@@ -1,0 +1,13 @@
+{
+    "facts": {
+        "name": {
+            "value": "Shivam"
+        },
+        "age": {
+            "value": "18"
+        }
+    },
+    "preferences": [],
+    "tasks": [],
+    "projects": []
+}
