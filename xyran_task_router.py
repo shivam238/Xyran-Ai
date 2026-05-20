@@ -112,8 +112,12 @@ def route_intent(text, prev_action_category=None):
     Returns one of: "LLM_PLANNER", "DIRECT_HANDLER", "LLM_FALLBACK"
     """
     # Expose screen brightness direct routing immediately
-    from xyran_input_utils import is_screen_brightness_request
+    from xyran_input_utils import is_screen_brightness_request, is_weather_request
     if is_screen_brightness_request(text, prev_action_category=prev_action_category):
+        return "DIRECT_HANDLER"
+
+    # Weather queries always go directly to DIRECT_HANDLER (handled via wttr.in)
+    if is_weather_request(text):
         return "DIRECT_HANDLER"
 
     if is_compound_task(text):
