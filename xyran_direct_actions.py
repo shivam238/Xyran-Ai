@@ -226,7 +226,17 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
         return True
 
     if is_greeting(lowered):
-        print("[Xyran] Hello! Kya help chahiye?")
+        import random
+        greetings = [
+            "Hello! Kaise ho? Kya madad kar sakta hoon? 😊",
+            "Namaste! Batao, aaj kya kaam hai? 🙏",
+            "Hey! Sab theek hai? Kya help chahiye? 🌟",
+            "Haan bolo! Main yahaan hoon. 😎",
+            "Kya haal chaal hai? Batao, kya kar sakte hain aaj? 🚀",
+            "Hello bhai! Bol kya scene hai? 😄",
+            "Hey there! Kya plan hai aaj ka? ⚡",
+        ]
+        print(f"[Xyran] {random.choice(greetings)}")
         return True
 
     smalltalk_reply = get_local_smalltalk_reply(lowered)
