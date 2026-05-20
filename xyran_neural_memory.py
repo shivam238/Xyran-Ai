@@ -43,7 +43,7 @@ def get_model():
     if _model is None:
         try:
             from huggingface_hub import login
-            login(new_session=False)
+            login()
         except Exception:
             pass
         from sentence_transformers import SentenceTransformer

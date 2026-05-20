@@ -8,7 +8,7 @@ def process_response(reply, run_command, command_failed, summarize_output, clean
         action = data.get("action")
         explain = data.get("explain", "")
 
-        if explain:
+        if explain and action != "answer":
             print(f"\n[Xyran] {explain}")
 
         if action in ("run", "look_and_act"):
