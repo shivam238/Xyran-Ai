@@ -1,0 +1,134 @@
+{
+  "name": "Xyran",
+  "version": "1.0",
+  "created_by": "Shivam Kumar Mahto",
+  "github": "shivam238",
+  "repo": "https://github.com/shivam238/Xyran-Ai",
+  "license": "MIT Open Source License",
+  "created_date": "May 2026",
+  "description": "A self-aware, locally-integrated personal AI agent for Linux, macOS, and Windows.",
+
+  "changelog": [
+    {
+      "version": "0.0",
+      "date": "Early 2026",
+      "label": "v0 — Early Build",
+      "changes": [
+        "Simple single-file chatbot",
+        "Basic API-based Q&A only",
+        "No memory, no vision, no automation"
+      ]
+    },
+    {
+      "version": "0.5",
+      "date": "April 2026",
+      "label": "v0.5 — Shell Automation",
+      "changes": [
+        "Basic shell command execution added",
+        "Can open GUI apps via subprocess",
+        "Screenshot support added (early version)",
+        "Browser launching support added"
+      ]
+    },
+    {
+      "version": "1.0",
+      "date": "May 2026",
+      "label": "v1.0 — Full Agentic System (Current)",
+      "changes": [
+        "Full modular architecture with 15+ specialized modules",
+        "Dual memory system: FAISS vector index + SQLite relational DB",
+        "Real-time screen vision via Wayland Freedesktop XDG Portal",
+        "Hybrid LLM routing: Groq (fast) + Gemini (vision/complex) + Ollama (offline fallback)",
+        "Smart Intent Gatekeeper — direct handler bypasses LLM for offline tasks",
+        "Multi-step command execution engine (run_multi) with timing delays",
+        "Real-time weather via wttr.in (no API key needed)",
+        "Live news headlines via NewsAPI with category and country filters",
+        "Image generation module integrated",
+        "System controls: volume, brightness, keyboard backlight, DND mode",
+        "Premium terminal UX with ThinkingSpinner (thread-based animated indicator)",
+        "Self-awareness system: knows its own creator, history, tech stack, and abilities",
+        "Cross-platform support: Linux, macOS, Windows"
+      ]
+    }
+  ],
+
+  "tech_stack": {
+    "language": "Python 3.10+",
+    "llm_providers": ["Groq API (llama-3.3-70b, llama-4-scout)", "Google Gemini API", "Ollama (local offline fallback)"],
+    "vision_model": "meta-llama/llama-4-scout-17b-16e-instruct (via Groq)",
+    "vector_memory": "FAISS (Facebook AI Similarity Search) + SentenceTransformers (all-MiniLM-L6-v2 from HuggingFace)",
+    "relational_memory": "SQLite via Python sqlite3",
+    "screenshot": "D-Bus / Freedesktop XDG Desktop Portal (Wayland native, no xrandr/scrot needed)",
+    "app_launching": "gtk-launch (via .desktop IDs) + subprocess.Popen",
+    "browser_automation": "Brave Browser / Google Chrome / Firefox via shell commands",
+    "gui_interaction": "xdotool (X11) + D-Bus session API (Wayland)",
+    "terminal_ux": "Python threading.Thread (ThinkingSpinner class)",
+    "web_data": "urllib.request — weather via wttr.in, news via NewsAPI v2",
+    "image_generation": "Custom modules/image_gen/ module",
+    "dependency_management": "pip + requirements.txt",
+    "os_support": "Linux (Fedora/Ubuntu/Arch/Debian) primary, macOS, Windows"
+  },
+
+  "features": [
+    {
+      "name": "Dual Memory System",
+      "emoji": "🧠",
+      "description": "FAISS vector index for semantic recall + SQLite for structured facts. Remembers your preferences, name, projects, tasks across sessions."
+    },
+    {
+      "name": "Real-Time Vision",
+      "emoji": "👁️",
+      "description": "Takes Wayland-native screenshots and uses Vision LLM to see your screen. Understands visible apps, open files, terminal output, browser tabs."
+    },
+    {
+      "name": "Smart Intent Routing",
+      "emoji": "⚡",
+      "description": "Adaptive gatekeeper — fast direct handler (no LLM cost/latency) for offline tasks, full AI brain only for complex/reasoning queries."
+    },
+    {
+      "name": "System Automation",
+      "emoji": "🖥️",
+      "description": "Opens/closes GUI apps, browsers, files, editors. Controls volume, screen brightness, keyboard backlight, DND mode."
+    },
+    {
+      "name": "Multi-step Command Engine",
+      "emoji": "🌐",
+      "description": "Executes chains of 2-10+ actions in sequence with timing delays. Example: open editor → write text → screenshot → show it."
+    },
+    {
+      "name": "Live Weather",
+      "emoji": "🌦️",
+      "description": "Fetches real-time weather via wttr.in. No API key needed. Hinglish formatted report with temp, humidity, wind, visibility."
+    },
+    {
+      "name": "News Headlines",
+      "emoji": "📰",
+      "description": "Fetches live headlines from NewsAPI. Supports category filters (tech, sports, business) and country filters."
+    },
+    {
+      "name": "Image Generation",
+      "emoji": "🎨",
+      "description": "Generates AI images on request via the integrated image generation module."
+    },
+    {
+      "name": "Hinglish Personality",
+      "emoji": "💬",
+      "description": "Responds naturally in Hinglish, Hindi, or English — dynamically matching the user's language style."
+    },
+    {
+      "name": "Hybrid LLM Routing",
+      "emoji": "🔄",
+      "description": "Auto-selects the best model — Gemini for vision/complex tasks, Groq for lightning-fast responses, Ollama for offline fallback."
+    },
+    {
+      "name": "Premium Terminal UX",
+      "emoji": "✨",
+      "description": "Animated ThinkingSpinner during API calls, clean output formatting, and no redundant internal logs."
+    },
+    {
+      "name": "Self-Awareness",
+      "emoji": "🌌",
+      "description": "Knows its own creator, history, tech stack, version, and abilities. Loaded dynamically from xyran_identity.json."
+    }
+  ]
+}

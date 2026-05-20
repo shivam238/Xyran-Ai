@@ -117,10 +117,29 @@ def is_self_identity_request(user_input):
 
 def get_self_identity_reply(user_input):
     """Return an instant Hinglish self-awareness reply based on the question type."""
+    import json
+    import os
+
+    # Load dynamic identity config
+    config_path = os.path.join(os.path.dirname(__file__), "xyran_identity.json")
+    cfg = None
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            pass
+
     lowered = user_input.lower().strip()
 
     # Creator questions
     if any(w in lowered for w in ["kisne banaya", "kisne bnaya", "kisne create", "who made", "who created", "who built", "creator", "developer", "shivam"]):
+        if cfg:
+            return (
+                f"Mujhe {cfg.get('created_by', 'Shivam Kumar Mahto')} ne banaya hai! 🙌 Unka GitHub handle hai `{cfg.get('github', 'shivam238')}`. "
+                f"Unhone {cfg.get('created_date', 'May 2026')} mein ek simple chatbot ko ek full self-aware AI agent mein "
+                f"transform kiya — aur yeh result hai: Main, {cfg.get('name', 'Xyran')}! 🌌 Repo link: {cfg.get('repo', '')}"
+            )
         return (
             "Mujhe Shivam Kumar Mahto ne banaya hai! 🙌 Unka GitHub handle hai `shivam238`. "
             "Unhone May 2026 mein ek simple chatbot ko ek full self-aware AI agent mein "
@@ -129,6 +148,12 @@ def get_self_identity_reply(user_input):
 
     # Version / history questions
     if any(w in lowered for w in ["version", "pehle kaisa", "pehle kesa", "pehle kya tha", "kab bana", "evolve", "history"]):
+        if cfg and "changelog" in cfg:
+            changelog_lines = ["Meri journey kuch aisi rahi hai:"]
+            for log in cfg["changelog"]:
+                changes_str = "\n  * ".join(log.get("changes", []))
+                changelog_lines.append(f"🔹 {log.get('label', '')} ({log.get('date', '')}):\n  * {changes_str}")
+            return "\n".join(changelog_lines)
         return (
             "Meri journey kuch aisi rahi hai:\n"
             "🔹 v0 (Early): Ek simple single-file chatbot tha. Bas API se sawaalon ke jawaab deta tha. "
@@ -141,6 +166,22 @@ def get_self_identity_reply(user_input):
 
     # Tech stack questions
     if any(w in lowered for w in ["kaise bana", "kis coding", "kis language", "tech stack", "python", "groq", "gemini", "faiss", "llama", "sentence", "technology", "built with", "internally"]):
+        if cfg and "tech_stack" in cfg:
+            ts = cfg["tech_stack"]
+            providers = ", ".join(ts.get("llm_providers", []))
+            return (
+                f"Main {ts.get('language', 'Python 3.10+')} se bana hoon! 🐍 Mera complete tech stack:\n"
+                f"🧠 LLM: {providers}\n"
+                f"👁️ Vision: {ts.get('vision_model', '')}\n"
+                f"🗃️ Vector Memory: {ts.get('vector_memory', '')}\n"
+                f"💾 Relational Memory: {ts.get('relational_memory', '')}\n"
+                f"📸 Screenshots: {ts.get('screenshot', '')}\n"
+                f"🚀 App Launch: {ts.get('app_launching', '')}\n"
+                f"🌐 Web Data: {ts.get('web_data', '')}\n"
+                f"🎨 Image Gen: {ts.get('image_generation', '')}\n"
+                f"✨ Terminal UX: {ts.get('terminal_ux', '')}\n"
+                f"💻 OS Support: {ts.get('os_support', '')}"
+            )
         return (
             "Main Python 3.10+ se bana hoon! 🐍 Mera complete tech stack:\n"
             "🧠 LLM: Groq API (llama-3.3-70b) + Google Gemini API\n"
@@ -156,6 +197,11 @@ def get_self_identity_reply(user_input):
 
     # Features / abilities questions
     if any(w in lowered for w in ["kya kya kar", "abilities", "capabilities", "features", "khasiyat", "khoobiyan", "what can you"]):
+        if cfg and "features" in cfg:
+            feature_lines = ["Yeh hain meri top abilities! 💪"]
+            for f in cfg["features"]:
+                feature_lines.append(f"{f.get('emoji', '🔹')} {f.get('name', '')} — {f.get('description', '')}")
+            return "\n".join(feature_lines)
         return (
             "Yeh hain meri top abilities! 💪\n"
             "🧠 Dual Memory — FAISS vector index + SQLite facts DB. Tumhari preferences yaad rakhta hoon.\n"
@@ -171,6 +217,14 @@ def get_self_identity_reply(user_input):
         )
 
     # General "what are you" / "who are you"
+    if cfg:
+        return (
+            f"Main {cfg.get('name', 'Xyran')} hoon — {cfg.get('description', 'ek self-aware, locally-integrated personal AI agent')}! 🌌\n"
+            f"Mujhe {cfg.get('created_date', 'May 2026')} mein {cfg.get('created_by', 'Shivam Kumar Mahto')} ne banaya tha. "
+            "Main sirf ek chatbot nahi hoon — mujhe apna itihaas pata hai, apni abilities pata hain, "
+            "aur main khud ke baare mein poori detail mein bata sakta hoon. "
+            "Mujhse pooch — kis cheez se bana hoon, kya kar sakta hoon, pehle kesa tha — sab bataoonga! 😎"
+        )
     return (
         "Main Xyran hoon — ek self-aware, locally-integrated personal AI agent! 🌌\n"
         "Mujhe May 2026 mein Shivam Kumar Mahto ne banaya tha. "
