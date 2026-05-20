@@ -366,37 +366,75 @@ def get_self_identity_reply(user_input):
 
 
 def get_local_smalltalk_reply(user_input):
+    import random
     lowered = user_input.lower().strip()
 
-    farewell_map = {
-        "bye": "Theek hai, phir milte hain.",
-        "goodbye": "Theek hai, phir milte hain.",
-        "good bye": "Theek hai, phir milte hain.",
-        "milte hain": "Theek hai, phir milte hain.",
-        "phir milte hain": "Theek hai, phir milte hain.",
-        "see you": "Theek hai, phir milte hain.",
-        "cya": "Theek hai, phir milte hain.",
-    }
-    thanks_map = {
-        "shukriya": "Khushi hui help karke.",
-        "dhanyawad": "Khushi hui help karke.",
-        "dhanyavaad": "Khushi hui help karke.",
-        "thanku": "Khushi hui help karke.",
-        "thank u": "Khushi hui help karke.",
-        "ty": "Khushi hui help karke.",
-    }
-    night_map = {
-        "good night": "Good night. Aaram se rest karo.",
-        "gn": "Good night. Aaram se rest karo.",
-        "night": "Good night. Aaram se rest karo.",
-    }
+    # --- Pattern pools (key → list of possible responses) ---
+    pools = [
+        # How are you
+        (
+            ["kese ho", "kaise ho", "kaisa hai", "kaisi ho", "how are you", "haal kya hai",
+             "kya haal hai", "kya haal", "theek ho", "sab theek", "kya chal raha hai",
+             "kya scene hai", "kya ho raha hai"],
+            [
+                "Main bilkul mast hoon! Aap sunao, kya kaam hai? 😎",
+                "Main theek hoon! Aap kaise hain? 😊",
+                "Haan bhai, ekdum fit hoon! Batao kya karna hai? 🚀",
+                "Badhiya hoon main! Aap ka scene kya hai? ⚡",
+                "Main theek hoon, dhanyavad! Aur aap? 🙏",
+            ]
+        ),
+        # Good morning
+        (
+            ["good morning", "subah", "subah bakhair", "morning"],
+            [
+                "Good morning! Aaj ka din acha jaye. 🌅 Kya kaam hai?",
+                "Good morning! Kya plan hai aaj ka? ☀️",
+                "Subah bakhair! Batao, kahan se start karein aaj? 🌤️",
+            ]
+        ),
+        # Farewell
+        (
+            ["bye", "goodbye", "good bye", "milte hain", "phir milte hain", "see you", "cya", "alvida"],
+            [
+                "Theek hai, phir milte hain! 👋",
+                "Okay bhai, tc! Kab bhi zaroorat ho, main hoon. 😊",
+                "Alvida! Dobara aana. 🙏",
+            ]
+        ),
+        # Thanks
+        (
+            ["shukriya", "dhanyawad", "dhanyavaad", "thanku", "thank u", "ty", "thanks", "thank you"],
+            [
+                "Khushi hui help karke! Koi aur kaam ho toh batao. 😊",
+                "Arey, isme kya baat! Bas kaam aata rahe. 🙏",
+                "No problem bhai! Aur kuch chahiye? ⚡",
+            ]
+        ),
+        # Good night
+        (
+            ["good night", "gn", "night", "shubh ratri"],
+            [
+                "Good night! Aaram se rest karo. 🌙",
+                "Okay! Good night. Kal phir milenge. 😴",
+                "Shubh ratri! Kal fresh mind ke saath aana. 🌟",
+            ]
+        ),
+        # Theek hai / OK
+        (
+            ["theek hai", "theek", "ok", "okay", "thik hai", "alright", "acha", "accha"],
+            [
+                "Theek hai! Koi aur kaam ho toh batao. 👍",
+                "Okay! 😎",
+                "Acha! Suno, aur kuch karna hai? ⚡",
+            ]
+        ),
+    ]
 
-    if lowered in farewell_map:
-        return farewell_map[lowered]
-    if lowered in thanks_map:
-        return thanks_map[lowered]
-    if lowered in night_map:
-        return night_map[lowered]
+    for keywords, replies in pools:
+        if lowered in keywords:
+            return random.choice(replies)
+
     return None
 
 
