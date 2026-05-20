@@ -120,6 +120,11 @@ def route_intent(text, prev_action_category=None):
     if is_weather_request(text):
         return "DIRECT_HANDLER"
 
+    # News queries (headlines, summary, and next news) always go directly to DIRECT_HANDLER
+    from xyran_input_utils import is_news_request, is_more_news_request, is_news_summary_request
+    if is_news_request(text) or is_more_news_request(text, has_last_query=True) or is_news_summary_request(text, has_last_news_articles=True):
+        return "DIRECT_HANDLER"
+
     if is_compound_task(text):
         return "LLM_PLANNER"
 
