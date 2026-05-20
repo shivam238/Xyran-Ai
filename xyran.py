@@ -123,12 +123,9 @@ def main():
             # route == "LLM_PLANNER" or "LLM_FALLBACK" or direct handler miss
             # All go to LLM below
 
-            use_vision = (
-                should_use_vision(user_input)
-                or (runtime_state.last_input_used_vision and is_vision_followup(user_input))
-                or (runtime_state.vision_followup_turns_left > 0 and is_ambiguous_short_followup(user_input))
-            )
+            use_vision = should_use_vision(user_input)
 
+            # Perform memory search only for substantive queries (skip chitchat/short)
             neural_matches = []
             if not is_chitchat_or_short(user_input):
                 neural_matches = search_memory(user_input, top_n=3)

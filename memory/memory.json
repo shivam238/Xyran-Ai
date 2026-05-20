@@ -4,10 +4,15 @@
             "value": "18"
         },
         "dog_name": {
-            "value": "Sheru"
+            "value": "Ashita"
         }
     },
-    "preferences": [],
+    "preferences": [
+        {
+            "content": "User ko daaru aur sex karna pasand hai.",
+            "time": "2026-05-20T16:19:29.085182"
+        }
+    ],
     "tasks": [],
     "projects": []
 }
