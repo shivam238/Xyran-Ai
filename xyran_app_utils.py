@@ -104,6 +104,8 @@ def smart_open_browser(user_input, run_command):
         return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
 
     friendly_name = get_browser_friendly_name(browser)
+    # If on Wayland and no specific browser is requested, let xdg-open handle it if possible,
+    # but since it's just opening the browser, we fall back to launching the default resolved browser.
     run_command(f"{browser} &")
     if requested_name and requested_name != friendly_name:
         return f"{requested_name} installed nahi mila, isliye {friendly_name} khol diya."
@@ -112,14 +114,14 @@ def smart_open_browser(user_input, run_command):
 
 def smart_open_website(target, user_input, run_command):
     browser, requested_name = get_browser_for_request(user_input)
-    if not browser:
-        return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
-
-    friendly_name = get_browser_friendly_name(browser)
     normalized_target = target.strip()
     if not normalized_target.startswith(("http://", "https://")):
         normalized_target = f"https://{normalized_target}"
 
+    if not browser:
+        return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
+
+    friendly_name = get_browser_friendly_name(browser)
     run_command(f'{browser} "{normalized_target}" &')
     if requested_name and requested_name != friendly_name:
         return f"{requested_name} installed nahi mila, isliye website {friendly_name} mein khol di."
@@ -128,11 +130,12 @@ def smart_open_website(target, user_input, run_command):
 
 def smart_search_web(query, user_input, run_command):
     browser, requested_name = get_browser_for_request(user_input)
+    search_url = f"https://www.google.com/search?q={quote_plus(query)}"
+
     if not browser:
         return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye."
 
     friendly_name = get_browser_friendly_name(browser)
-    search_url = f"https://www.google.com/search?q={quote_plus(query)}"
     run_command(f'{browser} "{search_url}" &')
     if requested_name and requested_name != friendly_name:
         return f"{requested_name} installed nahi mila, isliye `{query}` ko {friendly_name} mein search kar diya."
@@ -142,6 +145,8 @@ def smart_search_web(query, user_input, run_command):
 def smart_open_youtube(user_input, run_command, last_browser_action):
     now = time.monotonic()
     browser, requested_name = get_browser_for_request(user_input)
+    is_wayland = os.environ.get("XDG_SESSION_TYPE") == "wayland"
+
     if not browser:
         return "Koi supported browser nahi mila. `brave-browser` ya `firefox` install hona chahiye.", last_browser_action
 
@@ -153,27 +158,32 @@ def smart_open_youtube(user_input, run_command, last_browser_action):
     ):
         return "YouTube abhi abhi handle kiya tha, isliye dobara open nahi kar raha.", last_browser_action
 
-    youtube_window_ids = get_xdotool_window_ids("YouTube")
-    browser_window_ids = get_xdotool_window_ids(browser, use_class=True)
+    # X11/Fallback: Check if YouTube is already open and focus it using xdotool
+    youtube_window_ids = []
+    browser_window_ids = []
+    if not is_wayland:
+        youtube_window_ids = get_xdotool_window_ids("YouTube")
+        browser_window_ids = get_xdotool_window_ids(browser, use_class=True)
 
     if wants_new_tab(user_input):
         run_command(f'{browser} --new-tab "https://youtube.com" &')
-        if browser_window_ids:
+        if not is_wayland and browser_window_ids:
             focus_window(browser_window_ids[-1])
         updated_action = {"target": "youtube", "browser": browser, "time": now}
         if requested_name and requested_name != browser_name:
             return f"{requested_name} installed nahi mila, isliye YouTube {browser_name} ke naye tab mein khol diya.", updated_action
         return f"YouTube {browser_name} ke naye tab mein khol diya.", updated_action
 
-    if youtube_window_ids:
+    if not is_wayland and youtube_window_ids:
         focus_window(youtube_window_ids[-1])
         updated_action = {"target": "youtube", "browser": browser, "time": now}
         return "YouTube pehle se open tha, usi tab ko saamne le aaya.", updated_action
 
     run_command(f'{browser} "https://youtube.com" &')
-    updated_browser_window_ids = get_xdotool_window_ids(browser, use_class=True)
-    if updated_browser_window_ids:
-        focus_window(updated_browser_window_ids[-1])
+    if not is_wayland:
+        updated_browser_window_ids = get_xdotool_window_ids(browser, use_class=True)
+        if updated_browser_window_ids:
+            focus_window(updated_browser_window_ids[-1])
     updated_action = {"target": "youtube", "browser": browser, "time": now}
     if requested_name and requested_name != browser_name:
         return f"{requested_name} installed nahi mila, isliye YouTube {browser_name} mein khol diya.", updated_action

@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 class RuntimeState:
     last_input_used_vision: bool = False
     vision_followup_turns_left: int = 0
+    prev_user_input: str | None = None
     last_user_input: str | None = None
     last_assistant_text: str | None = None
     last_screenshot_path: str | None = None
@@ -16,4 +17,7 @@ class RuntimeState:
     pending_name: str | None = None
     pending_age: str | None = None
     last_retrieved_memory_text: str | None = None
+    last_action_category: str | None = None
+    last_screen_brightness_percent: int = 50  # track current screen brightness for relative steps
+
 

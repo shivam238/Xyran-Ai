@@ -47,6 +47,15 @@ from xyran_input_utils import (
     is_screenshot_request,
     is_text_editor_request,
     wants_to_show_screenshot,
+    is_dnd_request,
+    extract_dnd_action,
+    is_keyboard_light_request,
+    extract_keyboard_light_action,
+    extract_keyboard_light_brightness,
+    is_screen_brightness_request,
+    extract_screen_brightness_percent,
+    percent_to_screen_raw,
+    SCREEN_BACKLIGHT_PATH,
 )
 
 
@@ -87,7 +96,7 @@ def _normalize_tokens(text):
 
 
 def should_write_last_answer(user_input, extracted_text, runtime_state):
-    if not extracted_text or not runtime_state.last_assistant_text or not runtime_state.last_user_input:
+    if not extracted_text or not runtime_state.last_assistant_text or not runtime_state.prev_user_input:
         return False
 
     lowered = user_input.lower()
@@ -108,7 +117,7 @@ def should_write_last_answer(user_input, extracted_text, runtime_state):
         return False
 
     current_tokens = _normalize_tokens(extracted_text)
-    previous_user_tokens = _normalize_tokens(runtime_state.last_user_input)
+    previous_user_tokens = _normalize_tokens(runtime_state.prev_user_input)
     overlap = current_tokens & previous_user_tokens
     return len(overlap) >= 2
 
@@ -157,6 +166,89 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
 
     if is_joke_request(lowered):
         print(f"[Xyran] {get_local_joke(pyjokes_module)}")
+        return True
+
+    prev_cat = runtime_state.last_action_category if runtime_state else None
+
+    if is_dnd_request(lowered, prev_action_category=prev_cat):
+        action = extract_dnd_action(user_input, runtime_state.prev_user_input if runtime_state else None, prev_action_category=prev_cat)
+        if action == "on":
+            msg = "Do Not Disturb mode on kar raha hoon."
+            cmd = "gsettings set org.gnome.desktop.notifications show-banners false"
+        else:
+            msg = "Do Not Disturb mode off kar raha hoon."
+            cmd = "gsettings set org.gnome.desktop.notifications show-banners true"
+        
+        print(f"[Xyran] {msg}")
+        print(f"[CMD] {cmd}")
+        output = run_command(cmd)
+        if output and output != "Done.":
+            print(f"[Output] {output}")
+        if command_failed(output):
+            print("[Xyran] Do Not Disturb toggling fail ho gaya.")
+            if ai:
+                ai.conversation_history.append({"role": "user", "content": user_input})
+                ai.conversation_history.append({"role": "assistant", "content": f"{msg} Lekin toggling fail ho gaya."})
+        else:
+            print("[Xyran] Ho gaya.")
+            if runtime_state:
+                runtime_state.last_action_category = "dnd"
+            if ai:
+                ai.conversation_history.append({"role": "user", "content": user_input})
+                ai.conversation_history.append({"role": "assistant", "content": f"{msg} Ho gaya."})
+        return True
+
+    if is_keyboard_light_request(lowered, prev_action_category=prev_cat):
+        brightness = extract_keyboard_light_brightness(user_input, runtime_state.prev_user_input if runtime_state else None, prev_action_category=prev_cat)
+        if brightness == 0:
+            msg = "Keyboard wali light off kar raha hoon."
+        else:
+            msg = f"Keyboard wali light {brightness}% brightness pe set kar raha hoon."
+            
+        print(f"[Xyran] {msg}")
+        cmd = f'gdbus call --session --dest org.gnome.SettingsDaemon.Power --object-path /org/gnome/SettingsDaemon/Power --method org.freedesktop.DBus.Properties.Set org.gnome.SettingsDaemon.Power.Keyboard Brightness "<int32 {brightness}>"'
+        print(f"[CMD] {cmd}")
+        output = run_command(cmd)
+        if output and output != "Done.":
+            print(f"[Output] {output}")
+        if command_failed(output):
+            print("[Xyran] Keyboard light setting fail ho gaya.")
+            if ai:
+                ai.conversation_history.append({"role": "user", "content": user_input})
+                ai.conversation_history.append({"role": "assistant", "content": f"{msg} Lekin setting fail ho gaya."})
+        else:
+            print("[Xyran] Ho gaya.")
+            if runtime_state:
+                runtime_state.last_action_category = "keyboard"
+            if ai:
+                ai.conversation_history.append({"role": "user", "content": user_input})
+                ai.conversation_history.append({"role": "assistant", "content": f"{msg} Ho gaya."})
+        return True
+
+    if is_screen_brightness_request(user_input, prev_action_category=prev_cat):
+        current_pct = runtime_state.last_screen_brightness_percent if runtime_state else None
+        percent = extract_screen_brightness_percent(user_input, current_percent=current_pct)
+        raw = percent_to_screen_raw(percent)
+        brightness_file = f"{SCREEN_BACKLIGHT_PATH}/brightness"
+        msg = f"Screen brightness {percent}% par set kar raha hoon."
+        print(f"[Xyran] {msg}")
+        try:
+            with open(brightness_file, "w") as bf:
+                bf.write(str(raw))
+            print(f"[Xyran] Ho gaya. ({raw}/{percent_to_screen_raw(100)})")  
+            if runtime_state:
+                runtime_state.last_action_category = "screen"
+                runtime_state.last_screen_brightness_percent = percent
+            if ai:
+                ai.conversation_history.append({"role": "user", "content": user_input})
+                ai.conversation_history.append({"role": "assistant", "content": f"{msg} Ho gaya."})
+        except PermissionError:
+            print("[Xyran] Permission denied. Pehle terminal mein yeh run karo:")
+            print("  sudo chgrp video /sys/class/backlight/intel_backlight/brightness")
+            print("  sudo chmod g+w /sys/class/backlight/intel_backlight/brightness")
+            print("[Xyran] (Yeh ek-baar karna hoga, reboot ke baad udev rule se automatic hoga)")
+        except FileNotFoundError:
+            print("[Xyran] Backlight path nahi mila. intel_backlight support nahi hai is system pe.")
         return True
 
     if is_news_summary_request(lowered, bool(news_manager.last_news_articles)):
@@ -343,8 +435,13 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
         else:
             print(f"[Xyran] {editor} khol raha hoon")
 
-        print(f"[CMD] {editor} \"{file_path}\" &")
-        output = run_command(f'{editor} "{file_path}" &')
+        # Wayland focus fix: Force a NEW window so the compositor grants focus
+        editor_cmd = editor
+        if editor in ("gnome-text-editor", "gedit"):
+            editor_cmd = f"{editor} --new-window"
+
+        print(f"[CMD] {editor_cmd} \"{file_path}\" &")
+        output = run_command(f'{editor_cmd} "{file_path}" &')
         if output and output != "Done.":
             print(f"[Output] {output}")
             if command_failed(output):

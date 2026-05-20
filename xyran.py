@@ -3,6 +3,7 @@ from xyran_memory import remember, recall, format_memory_for_ai
 from memory_db import init_db, migrate_old_neural_memories, insert_memory
 from vector_memory import build_index, search_memory, is_chitchat_or_short
 from xyran_brain import brain
+from xyran_task_router import route_intent
 from groq import Groq, RateLimitError
 from config import (
     AI_NAME,
@@ -82,8 +83,7 @@ def main():
     news_manager.load_state()
     print(f"""
 ╔══════════════════════════════════════════╗
-║         XYRAN AI v2 - ONLINE             ║
-║   Brain + Aankhein — Dono Ready Hain     ║
+║         XYRAN AI v1 - ONLINE             ║
 ╚══════════════════════════════════════════╝
 'exit' likho band karne ke liye.
 """)
@@ -93,6 +93,7 @@ def main():
             user_input = read_user_input(f"[{USER_NAME}] ").strip()
             if not user_input:
                 continue
+            runtime_state.prev_user_input = runtime_state.last_user_input
             runtime_state.last_user_input = user_input
             if user_input.lower() in ("exit", "quit", "band karo"):
                 print("[Xyran] Theek hai. Phir milenge.")
@@ -110,9 +111,17 @@ def main():
                 print(f"[{AI_NAME}] {brain_result}")
                 continue
 
-            if handle_direct_action(user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai):
-                runtime_state.last_input_used_vision = False
-                continue
+            # --- Intent Router (Gatekeeper) ---
+            route = route_intent(user_input, prev_action_category=runtime_state.last_action_category if runtime_state else None)
+
+            if route == "DIRECT_HANDLER":
+                if handle_direct_action(user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai):
+                    runtime_state.last_input_used_vision = False
+                    continue
+                # Direct handler didn't match — fall through to LLM
+
+            # route == "LLM_PLANNER" or "LLM_FALLBACK" or direct handler miss
+            # All go to LLM below
 
             use_vision = (
                 should_use_vision(user_input)

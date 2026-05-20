@@ -777,3 +777,198 @@ def wants_new_tab(user_input):
         "another tab", "second tab", "alag tab",
     ]
     return any(phrase in lowered for phrase in phrases)
+
+
+def extract_dnd_action(user_input, last_user_input=None, prev_action_category=None):
+    lowered = user_input.lower().strip()
+    off_words = ["off", "disable", "band", "deactivate", "stop", "hatado", "hata do", "bnd"]
+    on_words = ["on", "enable", "chalu", "activate", "start", "lga", "laga"]
+    
+    dnd_match = any(word in lowered for word in ["do not disturb", "dnd", "disturb"])
+    is_ambiguous_toggle = lowered in [
+        "on", "off", "chalu", "band", "bnd", "on kr", "off kr", "chalu kr", 
+        "band kr", "bnd kr", "on karo", "off karo", "band karo", "bnd karo", 
+        "bnd krde", "band krde"
+    ]
+    
+    if not (dnd_match or (is_ambiguous_toggle and prev_action_category == "dnd")):
+        return None
+        
+    for word in off_words:
+        if word in lowered:
+            return "off"
+    for word in on_words:
+        if word in lowered:
+            return "on"
+            
+    if last_user_input:
+        last_lowered = last_user_input.lower().strip()
+        for word in off_words:
+            if word in last_lowered:
+                return "off"
+        for word in on_words:
+            if word in last_lowered:
+                return "on"
+                
+    return "on"
+
+
+def is_dnd_request(user_input, prev_action_category=None):
+    return extract_dnd_action(user_input, prev_action_category=prev_action_category) is not None
+
+
+def extract_keyboard_light_action(user_input, last_user_input=None, prev_action_category=None):
+    lowered = user_input.lower().strip()
+    
+    # Negative checks to avoid screen brightness or volume conflict
+    if any(word in lowered for word in ["screen", "display", "monitor", "screen light", "screen brightness", "volume", "sound", "awaj", " आवाज"]):
+        return None
+        
+    kb_keywords = ["keyboard", "kbd", "key board"]
+    light_keywords = ["light", "brightness", "backlight", "chalu", "band", "dim", "bright", "full", "half", "medium", "percent", "%", "kam", "badha"]
+    
+    kb_match = any(word in lowered for word in kb_keywords)
+    light_match = any(word in lowered for word in light_keywords)
+    
+    is_ambiguous_toggle = lowered in [
+        "on", "off", "chalu", "band", "bnd", "on kr", "off kr", "chalu kr", 
+        "band kr", "bnd kr", "on karo", "off karo", "band karo", "bnd karo", 
+        "bnd krde", "band krde"
+    ]
+    
+    # Check if context-aware follow-up
+    is_followup = False
+    if prev_action_category == "keyboard":
+        followup_keywords = light_keywords + ["on", "off", "kr", "kar", "chalu", "band", "karo", "krde"]
+        is_followup = any(word in lowered for word in followup_keywords) or any(char.isdigit() for char in lowered)
+        
+    if not ((kb_match and (light_match or "wali" in lowered or "ki" in lowered)) or is_followup or (is_ambiguous_toggle and prev_action_category == "keyboard")):
+        return None
+        
+    off_words = ["off", "disable", "band", "deactivate", "stop", "hatado", "hata do", "zero", "bnd"]
+    on_words = ["on", "enable", "chalu", "activate", "start", "lga", "laga", "full", "dim", "bright", "half", "medium", "percent", "%", "kam", "badha"]
+    
+    for word in off_words:
+        if word in lowered:
+            return "off"
+    for word in on_words:
+        if word in lowered:
+            return "on"
+            
+    if last_user_input:
+        last_lowered = last_user_input.lower().strip()
+        for word in off_words:
+            if word in last_lowered:
+                return "off"
+        for word in on_words:
+            if word in last_lowered:
+                return "on"
+                
+    return "on"
+
+
+def extract_keyboard_light_brightness(user_input, last_user_input=None, prev_action_category=None):
+    lowered = user_input.lower().strip()
+    match = re.search(r"(\d+)\s*%?", lowered)
+    if match:
+        val = int(match.group(1))
+        if 0 <= val <= 100:
+            return val
+            
+    # Check semantic adjustment keywords
+    if any(word in lowered for word in ["dim", "kam", "decrease", "down", "ghata"]):
+        return 30
+    if any(word in lowered for word in ["medium", "half", "50"]):
+        return 50
+    if any(word in lowered for word in ["bright", "full", "max", "badha", "increase", "up"]):
+        return 100
+        
+    action = extract_keyboard_light_action(user_input, last_user_input, prev_action_category)
+    if action == "off":
+        return 0
+    return 100
+
+
+def is_keyboard_light_request(user_input, prev_action_category=None):
+    return extract_keyboard_light_action(user_input, prev_action_category=prev_action_category) is not None
+
+
+# ---------------------------------------------------------------------------
+# Screen Brightness helpers (intel_backlight via sysfs)
+# ---------------------------------------------------------------------------
+
+SCREEN_BACKLIGHT_PATH = "/sys/class/backlight/intel_backlight"
+
+
+def is_screen_brightness_request(user_input, prev_action_category=None):
+    """Returns True if user is asking to adjust screen/display brightness."""
+    lowered = user_input.lower().strip()
+    
+    # If they explicitly mention keyboard/backlight or volume, it's not a screen request
+    if any(w in lowered for w in ["keyboard", "kbd", "key board", "backlight", "volume", "sound", "awaj", " आवाज", "audio"]):
+        return False
+        
+    # Check if context-aware follow-up
+    if prev_action_category == "screen":
+        followup_keywords = ["kam", "badha", "ghata", "full", "half", "medium", "zero", 
+                             "dim", "bright", "percent", "%", "on", "off", "chalu", "band", "bnd"]
+        if any(w in lowered for w in followup_keywords) or any(char.isdigit() for char in lowered):
+            return True
+
+    screen_keywords = ["screen", "display", "monitor", "laptop screen", "brightness"]
+    brightness_keywords = ["brightness", "bright", "dim", "brightness", "kam", "badha",
+                           "percent", "%", "full", "half", "medium", "zero", "min", "max"]
+    has_screen = any(w in lowered for w in screen_keywords)
+    has_brightness = any(w in lowered for w in brightness_keywords)
+    return has_screen and has_brightness
+
+
+def extract_screen_brightness_percent(user_input, current_percent=None):
+    """
+    Returns desired brightness as a percentage (0–100).
+    Parses explicit numbers, or maps semantic words.
+    If current_percent is provided, handles relative 'or/aur kam/badha' adjustments.
+    """
+    lowered = user_input.lower().strip()
+    # Explicit percentage / number
+    match = re.search(r"(\d+)\s*%?", lowered)
+    if match:
+        val = int(match.group(1))
+        if 0 <= val <= 100:
+            return val
+
+    # Relative step: "or kam", "aur kam", "thoda aur kam", "or badha" etc.
+    has_relative = any(w in lowered for w in ["or", "aur", "thoda", "bhi"])
+    if has_relative and current_percent is not None:
+        if any(w in lowered for w in ["kam", "decrease", "down", "ghata", "dim", "low"]):
+            return max(5, current_percent - 15)
+        if any(w in lowered for w in ["badha", "increase", "up", "bright", "zyada"]):
+            return min(100, current_percent + 15)
+
+    # Semantic keywords (fixed presets)
+    if any(w in lowered for w in ["zero", "off", "minimum", "min"]):
+        return 5      # don't go full-zero on screen (unusable)
+    if any(w in lowered for w in ["dim", "kam", "decrease", "down", "ghata", "low"]):
+        return 30
+    if any(w in lowered for w in ["medium", "half"]):
+        return 50
+    if any(w in lowered for w in ["full", "max", "maximum", "badha", "increase", "up", "bright"]):
+        return 100
+    return 50         # safe default
+
+
+def get_screen_max_brightness():
+    """Read max_brightness from sysfs."""
+    try:
+        with open(f"{SCREEN_BACKLIGHT_PATH}/max_brightness") as f:
+            return int(f.read().strip())
+    except Exception:
+        return 21333  # fallback for this system
+
+
+def percent_to_screen_raw(percent):
+    """Convert 0-100% to raw brightness value."""
+    max_val = get_screen_max_brightness()
+    return max(0, int(round(percent / 100.0 * max_val)))
+
+
