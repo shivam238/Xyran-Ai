@@ -1,0 +1,1461 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Xyran AI — The AI Layer for Your Computer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #07080d;
+      --bg2:       #0d0f1a;
+      --bg3:       #111422;
+      --border:    rgba(124,58,237,.25);
+      --border2:   rgba(0,212,170,.2);
+      --purple:    #7c3aed;
+      --purple-l:  #a855f7;
+      --cyan:      #00d4aa;
+      --cyan-l:    #34ffe8;
+      --green:     #a8ff78;
+      --dim:       #3a3f5c;
+      --muted:     #6b7280;
+      --text:      #dde3f0;
+      --text-dim:  #8892a4;
+      --mono:      'JetBrains Mono', monospace;
+      --sans:      'Syne', sans-serif;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--mono);
+      overflow-x: hidden;
+      cursor: none;
+    }
+
+    /* ── Custom cursor ── */
+    #cursor {
+      width: 10px; height: 10px;
+      background: var(--cyan);
+      border-radius: 50%;
+      position: fixed; top: 0; left: 0;
+      pointer-events: none;
+      z-index: 9999;
+      transition: transform .12s ease;
+      mix-blend-mode: difference;
+    }
+    #cursor-ring {
+      width: 32px; height: 32px;
+      border: 1px solid rgba(0,212,170,.5);
+      border-radius: 50%;
+      position: fixed; top: 0; left: 0;
+      pointer-events: none;
+      z-index: 9998;
+      transition: left .08s ease, top .08s ease;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 2px; }
+
+    /* ── Canvas background ── */
+    #grid-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      opacity: .35;
+      pointer-events: none;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 clamp(1.5rem, 5vw, 4rem);
+      height: 60px;
+      background: rgba(7,8,13,.8);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo {
+      font-family: var(--sans);
+      font-weight: 800;
+      font-size: 1.2rem;
+      letter-spacing: .04em;
+      background: linear-gradient(90deg, var(--purple-l), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-decoration: none;
+    }
+    .nav-links { display: flex; gap: 2rem; list-style: none; }
+    .nav-links a {
+      color: var(--text-dim);
+      text-decoration: none;
+      font-size: .75rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      transition: color .2s;
+    }
+    .nav-links a:hover { color: var(--cyan); }
+    .nav-cta {
+      padding: .45rem 1.1rem;
+      background: transparent;
+      border: 1px solid var(--purple);
+      border-radius: 4px;
+      color: var(--purple-l);
+      font-family: var(--mono);
+      font-size: .75rem;
+      letter-spacing: .08em;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .2s, color .2s;
+    }
+    .nav-cta:hover { background: var(--purple); color: #fff; }
+
+    /* ── Sections base ── */
+    section { position: relative; z-index: 1; }
+
+    /* ── HERO ── */
+    #hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8rem 2rem 5rem;
+    }
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .3rem .9rem;
+      border: 1px solid var(--border2);
+      border-radius: 999px;
+      font-size: .7rem;
+      color: var(--cyan);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-bottom: 2rem;
+      animation: fadeUp .6s ease both;
+    }
+    .badge-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s ease infinite;
+    }
+    @keyframes pulse {
+      0%,100% { opacity: 1; transform: scale(1); }
+      50%      { opacity: .4; transform: scale(.7); }
+    }
+    .hero-title {
+      font-family: var(--sans);
+      font-weight: 800;
+      font-size: clamp(3rem, 8vw, 7rem);
+      line-height: .95;
+      letter-spacing: -.02em;
+      animation: fadeUp .7s .1s ease both;
+    }
+    .hero-title span {
+      background: linear-gradient(135deg, var(--purple-l) 0%, var(--cyan) 60%, var(--green) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-sub {
+      margin-top: 1.5rem;
+      max-width: 560px;
+      font-size: .9rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      animation: fadeUp .7s .2s ease both;
+    }
+    .hero-sub em {
+      color: var(--cyan);
+      font-style: normal;
+    }
+    .hero-btns {
+      margin-top: 2.5rem;
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      justify-content: center;
+      animation: fadeUp .7s .3s ease both;
+    }
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.8rem;
+      background: linear-gradient(135deg, var(--purple), var(--purple-l));
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: .8rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform .2s, box-shadow .2s;
+      box-shadow: 0 0 30px rgba(124,58,237,.4);
+    }
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 50px rgba(124,58,237,.7);
+    }
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1.8rem;
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--mono);
+      font-size: .8rem;
+      letter-spacing: .05em;
+      text-decoration: none;
+      cursor: pointer;
+      transition: border-color .2s, color .2s, transform .2s;
+    }
+    .btn-ghost:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      transform: translateY(-2px);
+    }
+    .hero-terminal {
+      margin-top: 4rem;
+      width: min(700px, 90vw);
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      animation: fadeUp .8s .4s ease both;
+      box-shadow: 0 40px 80px rgba(0,0,0,.6), 0 0 60px rgba(124,58,237,.08);
+    }
+    .term-header {
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      padding: .75rem 1rem;
+      background: var(--bg3);
+      border-bottom: 1px solid var(--border);
+    }
+    .term-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+    .td-red   { background: #ff5f57; }
+    .td-yellow{ background: #ffbd2e; }
+    .td-green { background: #28c840; }
+    .term-title {
+      flex: 1;
+      text-align: center;
+      font-size: .7rem;
+      color: var(--muted);
+      letter-spacing: .1em;
+    }
+    .term-body {
+      padding: 1.5rem;
+      font-size: .78rem;
+      line-height: 1.9;
+      text-align: left;
+    }
+    .t-prompt { color: var(--muted); }
+    .t-user   { color: var(--text-dim); }
+    .t-cmd    { color: var(--cyan); }
+    .t-ai     { color: var(--green); }
+    .t-label  { color: var(--purple-l); font-weight: 700; }
+    .t-muted  { color: var(--muted); font-size: .7rem; }
+    .cursor-blink {
+      display: inline-block;
+      width: 8px; height: 14px;
+      background: var(--cyan);
+      vertical-align: middle;
+      animation: blink 1s step-end infinite;
+    }
+    @keyframes blink { 0%,100%{ opacity: 1; } 50%{ opacity: 0; } }
+
+    /* ── SECTION COMMON ── */
+    .section-label {
+      font-size: .65rem;
+      letter-spacing: .2em;
+      text-transform: uppercase;
+      color: var(--purple-l);
+      margin-bottom: .75rem;
+    }
+    .section-title {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: clamp(2rem, 4vw, 3rem);
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+    .section-desc {
+      color: var(--text-dim);
+      font-size: .85rem;
+      line-height: 1.8;
+      max-width: 520px;
+    }
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 clamp(1.5rem, 5vw, 4rem);
+    }
+
+    /* ── FEATURES ── */
+    #features {
+      padding: 7rem 0;
+    }
+    .features-head { margin-bottom: 4rem; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 1.5px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .feat-card {
+      background: var(--bg);
+      padding: 2rem;
+      transition: background .3s;
+      position: relative;
+      overflow: hidden;
+    }
+    .feat-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(124,58,237,.04), transparent);
+      opacity: 0;
+      transition: opacity .3s;
+    }
+    .feat-card:hover { background: var(--bg2); }
+    .feat-card:hover::before { opacity: 1; }
+    .feat-icon {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .feat-title {
+      font-family: var(--sans);
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: .6rem;
+      color: #fff;
+    }
+    .feat-desc {
+      font-size: .75rem;
+      color: var(--text-dim);
+      line-height: 1.7;
+    }
+    .feat-tag {
+      display: inline-block;
+      margin-top: .75rem;
+      padding: .15rem .6rem;
+      border-radius: 3px;
+      font-size: .6rem;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+    }
+    .tag-purple { background: rgba(124,58,237,.15); color: var(--purple-l); border: 1px solid rgba(124,58,237,.3); }
+    .tag-cyan   { background: rgba(0,212,170,.1);  color: var(--cyan);     border: 1px solid rgba(0,212,170,.3); }
+    .tag-green  { background: rgba(168,255,120,.1); color: var(--green);   border: 1px solid rgba(168,255,120,.3); }
+
+    /* ── INSTALL ── */
+    #install {
+      padding: 7rem 0;
+      background: linear-gradient(180deg, transparent, var(--bg2) 30%, var(--bg2) 70%, transparent);
+    }
+    .install-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 3rem;
+      align-items: center;
+      margin-top: 3rem;
+    }
+    .os-tabs {
+      display: flex;
+      gap: .5rem;
+      margin-bottom: 1.5rem;
+    }
+    .os-tab {
+      padding: .4rem .9rem;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      font-size: .7rem;
+      color: var(--text-dim);
+      cursor: pointer;
+      font-family: var(--mono);
+      background: transparent;
+      letter-spacing: .05em;
+      transition: all .2s;
+    }
+    .os-tab.active {
+      border-color: var(--purple);
+      color: var(--purple-l);
+      background: rgba(124,58,237,.1);
+    }
+    .code-block {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .6rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .code-lang {
+      font-size: .65rem;
+      color: var(--muted);
+      letter-spacing: .1em;
+    }
+    .copy-btn {
+      font-size: .65rem;
+      color: var(--cyan);
+      background: transparent;
+      border: 1px solid var(--border2);
+      padding: .2rem .6rem;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: var(--mono);
+      transition: background .2s;
+    }
+    .copy-btn:hover { background: rgba(0,212,170,.1); }
+    .code-content {
+      padding: 1.25rem;
+      font-size: .78rem;
+      line-height: 1.8;
+      color: var(--green);
+      overflow-x: auto;
+    }
+    .code-comment { color: var(--muted); }
+    .code-cmd     { color: var(--cyan); }
+    .install-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 1.25rem;
+    }
+    .install-step {
+      display: flex;
+      gap: 1rem;
+      align-items: flex-start;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--purple);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: .7rem;
+      color: var(--purple-l);
+    }
+    .step-text { font-size: .82rem; line-height: 1.6; color: var(--text-dim); }
+    .step-text strong { color: var(--text); }
+
+    /* ── CHANGELOG ── */
+    #changelog {
+      padding: 7rem 0;
+    }
+    .changelog-grid {
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: 3rem;
+      margin-top: 3rem;
+    }
+    .version-list {
+      display: flex;
+      flex-direction: column;
+      gap: .5rem;
+    }
+    .v-item {
+      padding: .75rem 1rem;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .v-item.active {
+      border-color: var(--purple);
+      background: rgba(124,58,237,.08);
+    }
+    .v-item:hover:not(.active) {
+      border-color: var(--dim);
+      background: var(--bg2);
+    }
+    .v-num {
+      font-size: .8rem;
+      color: var(--purple-l);
+      font-weight: 700;
+    }
+    .v-date { font-size: .65rem; color: var(--muted); }
+    .v-badge {
+      font-size: .55rem;
+      padding: .15rem .5rem;
+      border-radius: 999px;
+      background: rgba(0,212,170,.1);
+      color: var(--cyan);
+      border: 1px solid rgba(0,212,170,.3);
+    }
+    .changelog-detail {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+    }
+    .cd-version {
+      font-family: var(--sans);
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: .25rem;
+    }
+    .cd-date { font-size: .75rem; color: var(--muted); margin-bottom: 1.5rem; }
+    .cd-list { list-style: none; display: flex; flex-direction: column; gap: .75rem; }
+    .cd-list li {
+      display: flex;
+      align-items: flex-start;
+      gap: .75rem;
+      font-size: .82rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+    .cd-list li::before {
+      content: '→';
+      color: var(--cyan);
+      flex-shrink: 0;
+      margin-top: .05em;
+    }
+
+    /* ── ROADMAP ── */
+    #roadmap {
+      padding: 7rem 0;
+      background: linear-gradient(180deg, transparent, var(--bg2) 30%, var(--bg2) 70%, transparent);
+    }
+    .roadmap-track {
+      margin-top: 3rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    .phase {
+      display: grid;
+      grid-template-columns: 140px 40px 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    .phase-label {
+      text-align: right;
+      padding-top: .3rem;
+    }
+    .phase-label .ph-name {
+      font-size: .8rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+    .phase-label .ph-date {
+      font-size: .65rem;
+      color: var(--muted);
+      margin-top: .2rem;
+    }
+    .phase-line {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .phase-dot {
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      border: 2px solid var(--purple);
+      background: var(--bg);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+      margin-top: .25rem;
+    }
+    .phase-dot.done {
+      background: var(--purple);
+      box-shadow: 0 0 12px rgba(124,58,237,.6);
+    }
+    .phase-dot.current {
+      border-color: var(--cyan);
+      background: rgba(0,212,170,.2);
+      animation: ring-pulse 2s ease infinite;
+    }
+    @keyframes ring-pulse {
+      0%,100% { box-shadow: 0 0 0 0 rgba(0,212,170,.5); }
+      50%      { box-shadow: 0 0 0 8px rgba(0,212,170,0); }
+    }
+    .phase-connector {
+      width: 2px;
+      flex: 1;
+      min-height: 60px;
+      background: linear-gradient(180deg, var(--dim), transparent);
+    }
+    .phase-content {
+      padding-bottom: 2.5rem;
+    }
+    .phase-title {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: .75rem;
+    }
+    .phase-items {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem;
+    }
+    .ph-chip {
+      padding: .3rem .75rem;
+      border-radius: 4px;
+      font-size: .7rem;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+    }
+    .ph-chip.done { border-color: rgba(124,58,237,.4); color: var(--purple-l); background: rgba(124,58,237,.06); }
+    .ph-chip.soon { border-color: rgba(0,212,170,.3); color: var(--cyan); background: rgba(0,212,170,.05); }
+
+    /* ── DOCS ── */
+    #docs {
+      padding: 7rem 0;
+    }
+    .docs-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      margin-top: 3rem;
+    }
+    .doc-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      text-decoration: none;
+      transition: transform .2s, border-color .2s, box-shadow .2s;
+      display: block;
+    }
+    .doc-card:hover {
+      transform: translateY(-4px);
+      border-color: var(--purple);
+      box-shadow: 0 12px 40px rgba(124,58,237,.15);
+    }
+    .doc-icon { font-size: 1.4rem; margin-bottom: .75rem; }
+    .doc-title {
+      font-family: var(--sans);
+      font-weight: 700;
+      font-size: .9rem;
+      margin-bottom: .4rem;
+      color: var(--text);
+    }
+    .doc-desc { font-size: .72rem; color: var(--text-dim); line-height: 1.6; }
+
+    /* ── COMMUNITY ── */
+    #community {
+      padding: 7rem 0;
+      background: linear-gradient(180deg, transparent, var(--bg2) 30%, var(--bg2) 70%, transparent);
+    }
+    .community-flex {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
+      margin-top: 3rem;
+    }
+    .comm-card {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: .75rem;
+      transition: border-color .3s, transform .3s;
+    }
+    .comm-card:hover {
+      border-color: var(--cyan);
+      transform: translateY(-3px);
+    }
+    .comm-icon { font-size: 2rem; }
+    .comm-title { font-family: var(--sans); font-weight: 700; font-size: 1.1rem; }
+    .comm-desc { font-size: .78rem; color: var(--text-dim); line-height: 1.7; }
+    .comm-link {
+      margin-top: .5rem;
+      font-size: .75rem;
+      color: var(--cyan);
+      text-decoration: none;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .comm-link:hover { text-decoration: underline; }
+
+    /* ── STATS ── */
+    .stats-row {
+      display: flex;
+      justify-content: center;
+      gap: 4rem;
+      padding: 3rem 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+      margin: 3rem 0;
+    }
+    .stat { text-align: center; }
+    .stat-num {
+      font-family: var(--sans);
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--purple-l), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .stat-label { font-size: .7rem; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; margin-top: .25rem; }
+
+    /* ── CTA ── */
+    #cta {
+      padding: 8rem 0;
+      text-align: center;
+    }
+    .cta-glow {
+      position: absolute;
+      width: 600px; height: 300px;
+      background: radial-gradient(ellipse, rgba(124,58,237,.15), transparent 70%);
+      top: 50%; left: 50%;
+      transform: translate(-50%,-50%);
+      pointer-events: none;
+    }
+    .cta-title {
+      font-family: var(--sans);
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+
+    /* ── FOOTER ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2.5rem clamp(1.5rem, 5vw, 4rem);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: .72rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--purple-l); text-decoration: none; }
+    footer a:hover { color: var(--cyan); }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity .6s ease, transform .6s ease;
+    }
+    .reveal.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ── MOBILE ── */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .install-grid,
+      .changelog-grid,
+      .community-flex { grid-template-columns: 1fr; }
+      .docs-grid { grid-template-columns: 1fr 1fr; }
+      .phase { grid-template-columns: 80px 32px 1fr; }
+      .stats-row { gap: 2rem; flex-wrap: wrap; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- cursor -->
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- canvas background -->
+<canvas id="grid-canvas"></canvas>
+
+<!-- NAV -->
+<nav>
+  <a class="nav-logo" href="#">XYRAN AI</a>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#install">Install</a></li>
+    <li><a href="#changelog">Changelog</a></li>
+    <li><a href="#docs">Docs</a></li>
+    <li><a href="#community">Community</a></li>
+  </ul>
+  <a class="nav-cta" href="#install">→ Get Started</a>
+</nav>
+
+<!-- HERO -->
+<section id="hero">
+  <div class="hero-badge">
+    <span class="badge-dot"></span>
+    v1.0 · Now Available for Linux, macOS & Windows
+  </div>
+  <h1 class="hero-title">
+    The AI Layer<br />
+    for <span>Your Computer</span>
+  </h1>
+  <p class="hero-sub">
+    Xyran is a powerful personal AI agent that bridges <em>advanced LLMs</em> with your local shell —
+    combining deep system automation, real-time vision, and vector memory under a beautifully polished terminal interface.
+  </p>
+  <div class="hero-btns">
+    <a href="#install" class="btn-primary">⬇ Install Xyran</a>
+    <a href="https://github.com/shivam238/Xyran-Ai" class="btn-ghost" target="_blank">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      GitHub
+    </a>
+    <a href="#" class="btn-ghost" id="try-web-btn">⚡ Try Web Demo</a>
+  </div>
+
+  <!-- Terminal demo -->
+  <div class="hero-terminal">
+    <div class="term-header">
+      <div class="term-dot td-red"></div>
+      <div class="term-dot td-yellow"></div>
+      <div class="term-dot td-green"></div>
+      <div class="term-title">XYRAN AI v1 — ONLINE</div>
+    </div>
+    <div class="term-body" id="term-output">
+      <div><span class="t-prompt">darkeeidea@fedora</span> <span class="t-cmd">~/Projects/XYRAN_AI</span> $ python xyran.py</div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="container">
+    <div class="features-head reveal">
+      <p class="section-label">// capabilities</p>
+      <h2 class="section-title">Everything your shell<br/>was missing.</h2>
+      <p class="section-desc">Xyran is not just a chatbot. It's a deeply integrated AI system that can see your screen, remember your preferences, automate your workflow, and talk back.</p>
+    </div>
+    <div class="features-grid reveal">
+      <div class="feat-card">
+        <div class="feat-icon">🧠</div>
+        <div class="feat-title">Hybrid Dual Memory</div>
+        <div class="feat-desc">FAISS neural vector store with <code>all-MiniLM-L6-v2</code> embeddings for semantic recall, paired with SQLite for persistent structured facts. Your AI actually remembers you.</div>
+        <div class="feat-tag tag-purple">Vector DB</div>
+        <div class="feat-tag tag-cyan" style="margin-left:.3rem;">SQLite</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">👁️</div>
+        <div class="feat-title">Real-Time Vision</div>
+        <div class="feat-desc">Natively captures GNOME/Wayland screenshots via the secure Freedesktop portal and passes visual context to a Vision LLM to "see" your work, errors, and GUI state.</div>
+        <div class="feat-tag tag-green">Llama 4 Scout</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">⚡</div>
+        <div class="feat-title">Smart Intent Routing</div>
+        <div class="feat-desc">Direct parser bypasses LLM latency for offline commands. Auto-selects between Gemini (visual/complex) and Groq (super-fast interactive answers) intelligently.</div>
+        <div class="feat-tag tag-purple">Gemini 2.5</div>
+        <div class="feat-tag tag-cyan" style="margin-left:.3rem;">Groq</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🖥️</div>
+        <div class="feat-title">Terminal Automation</div>
+        <div class="feat-desc">Launch browsers, execute searches, open tabs, capture screenshots, edit files — all in multi-step automated sequences triggered by natural language.</div>
+        <div class="feat-tag tag-green">Multi-step</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🎨</div>
+        <div class="feat-title">Premium Terminal UX</div>
+        <div class="feat-desc">Custom thread-based ThinkingSpinner with live animations. Responses rendered cleanly with Hinglish support. Clean, alive interface that doesn't feel like a script.</div>
+        <div class="feat-tag tag-purple">Hinglish</div>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🐧</div>
+        <div class="feat-title">Cross-Platform Native</div>
+        <div class="feat-desc">Built first for Linux (Fedora/Ubuntu/Arch) with full Wayland support, extended to macOS and Windows. Respects your OS, doesn't fight it.</div>
+        <div class="feat-tag tag-cyan">Linux</div>
+        <div class="feat-tag tag-green" style="margin-left:.3rem;">macOS</div>
+        <div class="feat-tag tag-purple" style="margin-left:.3rem;">Windows</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- STATS -->
+<div class="container">
+  <div class="stats-row reveal">
+    <div class="stat">
+      <div class="stat-num">2</div>
+      <div class="stat-label">AI backends</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">3</div>
+      <div class="stat-label">Platforms supported</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">∞</div>
+      <div class="stat-label">Memory capacity</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">v1.0</div>
+      <div class="stat-label">Current version</div>
+    </div>
+  </div>
+</div>
+
+<!-- INSTALL -->
+<section id="install">
+  <div class="container">
+    <div class="reveal">
+      <p class="section-label">// get started</p>
+      <h2 class="section-title">Install in seconds.</h2>
+      <p class="section-desc">One command. Any Linux distro. Also available on macOS and Windows.</p>
+    </div>
+    <div class="install-grid reveal">
+      <div>
+        <div class="os-tabs">
+          <button class="os-tab active" onclick="switchOS('linux', this)">🐧 Linux</button>
+          <button class="os-tab" onclick="switchOS('mac', this)">🍎 macOS</button>
+          <button class="os-tab" onclick="switchOS('win', this)">🏁 Windows</button>
+        </div>
+        <div class="code-block">
+          <div class="code-header">
+            <span class="code-lang">bash</span>
+            <button class="copy-btn" onclick="copyCode()">copy</button>
+          </div>
+          <pre class="code-content" id="install-code"><span class="code-comment"># Clone the repo</span>
+git clone https://github.com/shivam238/Xyran-Ai.git
+cd Xyran-Ai
+
+<span class="code-comment"># Fedora dependencies</span>
+<span class="code-cmd">sudo dnf install -y</span> python3-dbus python3-gobject xdotool
+
+<span class="code-comment"># Setup & run</span>
+python3 -m venv venv &amp;&amp; source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+<span class="code-cmd">python xyran.py</span></pre>
+        </div>
+      </div>
+      <div class="install-steps">
+        <p class="section-label">//  four steps</p>
+        <div class="install-step">
+          <div class="step-num">1</div>
+          <div class="step-text"><strong>Clone the repo</strong> from GitHub and enter the project directory.</div>
+        </div>
+        <div class="install-step">
+          <div class="step-num">2</div>
+          <div class="step-text"><strong>Install system deps</strong> for your distro (DBus, PyGObject, xdotool).</div>
+        </div>
+        <div class="install-step">
+          <div class="step-num">3</div>
+          <div class="step-text"><strong>Configure API keys</strong> — Groq &amp; Gemini keys in your <code>.env</code> file.</div>
+        </div>
+        <div class="install-step">
+          <div class="step-num">4</div>
+          <div class="step-text"><strong>Run <code>python xyran.py</code></strong> — on first start, the embedding model (~90MB) auto-downloads. Then you're live.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CHANGELOG -->
+<section id="changelog">
+  <div class="container">
+    <div class="reveal">
+      <p class="section-label">// release history</p>
+      <h2 class="section-title">What's changed.</h2>
+    </div>
+    <div class="changelog-grid reveal">
+      <div class="version-list">
+        <div class="v-item active" onclick="switchVersion(this, 'v1_0')">
+          <div>
+            <div class="v-num">v1.0.0</div>
+            <div class="v-date">20 May 2026</div>
+          </div>
+          <span class="v-badge">latest</span>
+        </div>
+        <div class="v-item" onclick="switchVersion(this, 'v0_4')">
+          <div>
+            <div class="v-num">v0.4.0</div>
+            <div class="v-date">08 May 2026</div>
+          </div>
+        </div>
+        <div class="v-item" onclick="switchVersion(this, 'v0_3')">
+          <div>
+            <div class="v-num">v0.3.0</div>
+            <div class="v-date">22 Apr 2026</div>
+          </div>
+        </div>
+        <div class="v-item" onclick="switchVersion(this, 'v0_2')">
+          <div>
+            <div class="v-num">v0.2.0</div>
+            <div class="v-date">05 Apr 2026</div>
+          </div>
+        </div>
+      </div>
+      <div class="changelog-detail" id="changelog-detail">
+        <!-- filled by JS -->
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROADMAP -->
+<section id="roadmap">
+  <div class="container">
+    <div class="reveal">
+      <p class="section-label">// whats next</p>
+      <h2 class="section-title">The roadmap.</h2>
+      <p class="section-desc">Xyran is actively built in public. Here's where we are and where we're headed.</p>
+    </div>
+    <div class="roadmap-track reveal">
+
+      <div class="phase">
+        <div class="phase-label">
+          <div class="ph-name">Phase 1</div>
+          <div class="ph-date">✓ Done</div>
+        </div>
+        <div class="phase-line">
+          <div class="phase-dot done"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-content">
+          <div class="phase-title">Core Terminal Agent</div>
+          <div class="phase-items">
+            <span class="ph-chip done">Groq + Gemini Routing</span>
+            <span class="ph-chip done">Vector Memory (FAISS)</span>
+            <span class="ph-chip done">Vision Capture</span>
+            <span class="ph-chip done">Terminal Automation</span>
+            <span class="ph-chip done">Weather/News Commands</span>
+            <span class="ph-chip done">Cross-platform Support</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-label">
+          <div class="ph-name">Phase 2</div>
+          <div class="ph-date">In Progress</div>
+        </div>
+        <div class="phase-line">
+          <div class="phase-dot current"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-content">
+          <div class="phase-title">Web Platform + Ecosystem</div>
+          <div class="phase-items">
+            <span class="ph-chip soon">Web Version (Browser)</span>
+            <span class="ph-chip soon">User Auth System</span>
+            <span class="ph-chip soon">Documentation Site</span>
+            <span class="ph-chip soon">Plugin Loader</span>
+            <span class="ph-chip soon">Voice Wake Word</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-label">
+          <div class="ph-name">Phase 3</div>
+          <div class="ph-date">Future</div>
+        </div>
+        <div class="phase-line">
+          <div class="phase-dot"></div>
+          <div class="phase-connector"></div>
+        </div>
+        <div class="phase-content">
+          <div class="phase-title">Community & Plugin Marketplace</div>
+          <div class="phase-items">
+            <span class="ph-chip">Community Forums</span>
+            <span class="ph-chip">Plugin Marketplace</span>
+            <span class="ph-chip">Cloud Memory Sync</span>
+            <span class="ph-chip">Voice Packs</span>
+            <span class="ph-chip">AI Automation Workflows</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="phase">
+        <div class="phase-label">
+          <div class="ph-name">Phase 4</div>
+          <div class="ph-date">Vision</div>
+        </div>
+        <div class="phase-line">
+          <div class="phase-dot"></div>
+        </div>
+        <div class="phase-content">
+          <div class="phase-title">AI-Powered OS Layer</div>
+          <div class="phase-items">
+            <span class="ph-chip">Android Companion App</span>
+            <span class="ph-chip">Custom LLM Fine-tune</span>
+            <span class="ph-chip">AI Desktop Shell</span>
+            <span class="ph-chip">Multi-agent Workflows</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- DOCS -->
+<section id="docs">
+  <div class="container">
+    <div class="reveal">
+      <p class="section-label">// documentation</p>
+      <h2 class="section-title">Everything you need.</h2>
+      <p class="section-desc">Comprehensive guides, API references, and troubleshooting for every platform.</p>
+    </div>
+    <div class="docs-grid reveal">
+      <a class="doc-card" href="#">
+        <div class="doc-icon">🚀</div>
+        <div class="doc-title">Quick Start</div>
+        <div class="doc-desc">Get Xyran running in under 5 minutes on any platform.</div>
+      </a>
+      <a class="doc-card" href="#">
+        <div class="doc-icon">⚙️</div>
+        <div class="doc-title">Configuration</div>
+        <div class="doc-desc">Environment variables, API keys, and behavior tuning.</div>
+      </a>
+      <a class="doc-card" href="#">
+        <div class="doc-icon">🎙️</div>
+        <div class="doc-title">Voice Setup</div>
+        <div class="doc-desc">Enable wake-word detection and voice command pipeline.</div>
+      </a>
+      <a class="doc-card" href="#">
+        <div class="doc-icon">🧩</div>
+        <div class="doc-title">Plugin Dev</div>
+        <div class="doc-desc">Build and publish custom plugins for the Xyran ecosystem.</div>
+      </a>
+      <a class="doc-card" href="#">
+        <div class="doc-icon">🔌</div>
+        <div class="doc-title">API Reference</div>
+        <div class="doc-desc">Internal Xyran Python API for advanced integrations.</div>
+      </a>
+      <a class="doc-card" href="#">
+        <div class="doc-icon">🛠️</div>
+        <div class="doc-title">Troubleshooting</div>
+        <div class="doc-desc">Common issues with Wayland, DBus, GPU acceleration and more.</div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- COMMUNITY -->
+<section id="community">
+  <div class="container">
+    <div class="reveal">
+      <p class="section-label">// community</p>
+      <h2 class="section-title">Build together.</h2>
+      <p class="section-desc">Xyran is open source and community-driven. Report bugs, share ideas, build plugins.</p>
+    </div>
+    <div class="community-flex reveal">
+      <div class="comm-card">
+        <div class="comm-icon">💬</div>
+        <div class="comm-title">Discussions</div>
+        <div class="comm-desc">Ask questions, share your Xyran setups, discuss AI automation ideas, and get help from the community.</div>
+        <a class="comm-link" href="https://github.com/shivam238/Xyran-Ai/discussions" target="_blank">→ GitHub Discussions</a>
+      </div>
+      <div class="comm-card">
+        <div class="comm-icon">🐛</div>
+        <div class="comm-title">Bug Reports</div>
+        <div class="comm-desc">Found something broken? File a detailed issue on GitHub. Good bug reports make Xyran better for everyone.</div>
+        <a class="comm-link" href="https://github.com/shivam238/Xyran-Ai/issues" target="_blank">→ Open an Issue</a>
+      </div>
+      <div class="comm-card">
+        <div class="comm-icon">💡</div>
+        <div class="comm-title">Feature Requests</div>
+        <div class="comm-desc">Have an idea for a new command, integration, or automation? We're listening. The best features come from real users.</div>
+        <a class="comm-link" href="https://github.com/shivam238/Xyran-Ai/issues/new" target="_blank">→ Submit Idea</a>
+      </div>
+      <div class="comm-card">
+        <div class="comm-icon">🤝</div>
+        <div class="comm-title">Contribute</div>
+        <div class="comm-desc">Code, docs, plugins, translations — all contributions are welcome. Fork, hack, and send a PR.</div>
+        <a class="comm-link" href="https://github.com/shivam238/Xyran-Ai/fork" target="_blank">→ Fork on GitHub</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section id="cta">
+  <div class="cta-glow"></div>
+  <div class="container" style="position:relative; text-align:center;">
+    <div class="reveal">
+      <p class="section-label" style="justify-content:center; display:flex;">//  ready?</p>
+      <h2 class="cta-title">
+        Give your computer<br/>
+        <span style="background:linear-gradient(135deg,var(--purple-l),var(--cyan));-webkit-background-clip:text;-webkit-text-fill-color:transparent;">
+          a brain.
+        </span>
+      </h2>
+      <p class="section-desc" style="margin: 1rem auto 2.5rem; text-align:center;">
+        Xyran is free, open source, and runs on your machine. No subscriptions. No cloud lock-in. Your AI, your rules.
+      </p>
+      <div class="hero-btns">
+        <a href="#install" class="btn-primary">⬇ Install Free</a>
+        <a href="https://github.com/shivam238/Xyran-Ai" class="btn-ghost" target="_blank">View Source</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div>
+    <strong style="color:var(--text);">XYRAN AI</strong> — MIT License © 2026
+    <a href="https://github.com/shivam238" target="_blank" style="margin-left:1rem;">shivam238</a>
+  </div>
+  <div style="display:flex;gap:2rem;">
+    <a href="#">GitHub</a>
+    <a href="#">Docs</a>
+    <a href="#">Changelog</a>
+    <a href="#">License</a>
+  </div>
+</footer>
+
+<script>
+/* ── Cursor ── */
+const cur = document.getElementById('cursor');
+const ring = document.getElementById('cursor-ring');
+let mx=0, my=0, rx=0, ry=0;
+document.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
+function animCursor() {
+  rx += (mx-rx)*.15; ry += (my-ry)*.15;
+  cur.style.left  = mx-5+'px'; cur.style.top  = my-5+'px';
+  ring.style.left = rx-16+'px'; ring.style.top = ry-16+'px';
+  requestAnimationFrame(animCursor);
+}
+animCursor();
+
+/* ── Canvas grid ── */
+const canvas = document.getElementById('grid-canvas');
+const ctx = canvas.getContext('2d');
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = document.body.scrollHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+function drawGrid() {
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  const size = 60;
+  ctx.strokeStyle = 'rgba(124,58,237,.12)';
+  ctx.lineWidth = .5;
+  for(let x=0;x<canvas.width;x+=size){
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvas.height); ctx.stroke();
+  }
+  for(let y=0;y<canvas.height;y+=size){
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvas.width,y); ctx.stroke();
+  }
+  // dots
+  ctx.fillStyle = 'rgba(0,212,170,.2)';
+  for(let x=0;x<canvas.width;x+=size)
+    for(let y=0;y<canvas.height;y+=size){
+      ctx.beginPath(); ctx.arc(x,y,1.2,0,Math.PI*2); ctx.fill();
+    }
+}
+drawGrid();
+window.addEventListener('resize',()=>{ resizeCanvas(); drawGrid(); });
+
+/* ── Terminal typewriter ── */
+const lines = [
+  {type:'prompt', text:"'exit' likho band karne ke liye."},
+  {type:'gap'},
+  {type:'user',  text:"[darkeeidea] aaj kaa mausam kesa hai"},
+  {type:'think', text:"[Xyran] Mausam dekh raha hoon..."},
+  {type:'ai',    text:"[Xyran] 📍 Dehli, India ka mausam:"},
+  {type:'ai',    text:"🌡️  Temperature: 45°C (feels like 48°C)"},
+  {type:'ai',    text:"☀️  Condition: Dhoop wala"},
+  {type:'ai',    text:"💧 Humidity: 10%"},
+  {type:'gap'},
+  {type:'user',  text:"[darkeeidea] DSA me trees kaa role step by step batao"},
+  {type:'think', text:"[Xyran] Thinking... ⠸"},
+  {type:'ai',    text:"[Xyran] Trees ek hierarchical structure provide karte hain..."},
+  {type:'ai',    text:"  1. BST → average O(log n) searching"},
+  {type:'ai',    text:"  2. Heap → priority queue, sorting"},
+  {type:'ai',    text:"  3. Trie → prefix search in O(k)"},
+  {type:'ai',    text:"  4. B-Tree → databases, disk I/O optimized"},
+];
+const out = document.getElementById('term-output');
+let li = 0, ci = 0, running = true;
+function typeNext() {
+  if(!running || li>=lines.length) return;
+  const l = lines[li];
+  if(l.type==='gap'){ out.innerHTML += '<br>'; li++; ci=0; setTimeout(typeNext,400); return; }
+  const colors = {prompt:'t-prompt',user:'t-user',think:'t-muted',ai:'t-ai'};
+  const cls = colors[l.type]||'t-text';
+  if(ci===0){ const d=document.createElement('div'); d.className=cls; d.id='cur-line'; out.appendChild(d); }
+  const el=document.getElementById('cur-line');
+  if(ci<l.text.length){
+    el.textContent = l.text.slice(0,ci+1);
+    ci++;
+    out.scrollTop=out.scrollHeight;
+    setTimeout(typeNext, l.type==='think'?40:18);
+  } else {
+    el.removeAttribute('id');
+    li++; ci=0;
+    setTimeout(typeNext, l.type==='think'?600:300);
+  }
+}
+setTimeout(typeNext, 1200);
+
+/* ── Scroll reveal ── */
+const revEls = document.querySelectorAll('.reveal');
+const obs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); });
+},{threshold:.1});
+revEls.forEach(el=>obs.observe(el));
+
+/* ── OS tabs ── */
+const codeMap = {
+  linux: `<span class="code-comment"># Clone the repo</span>
+git clone https://github.com/shivam238/Xyran-Ai.git
+cd Xyran-Ai
+
+<span class="code-comment"># Fedora dependencies</span>
+<span class="code-cmd">sudo dnf install -y</span> python3-dbus python3-gobject xdotool
+
+<span class="code-comment"># Setup & run</span>
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+<span class="code-cmd">python xyran.py</span>`,
+
+  mac: `<span class="code-comment"># Clone the repo</span>
+git clone https://github.com/shivam238/Xyran-Ai.git
+cd Xyran-Ai
+
+<span class="code-comment"># macOS dependencies via Homebrew</span>
+<span class="code-cmd">brew install</span> python xdotool
+
+<span class="code-comment"># Setup & run</span>
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+<span class="code-cmd">python xyran.py</span>`,
+
+  win: `<span class="code-comment"># Clone the repo</span>
+git clone https://github.com/shivam238/Xyran-Ai.git
+cd Xyran-Ai
+
+<span class="code-comment"># Windows: Python 3 must be in PATH</span>
+<span class="code-comment"># Use PowerShell or Git Bash</span>
+
+python -m venv venv
+venv\\Scripts\\activate
+pip install -r requirements.txt
+copy .env.example .env
+<span class="code-cmd">python xyran.py</span>`
+};
+function switchOS(os, btn) {
+  document.querySelectorAll('.os-tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('install-code').innerHTML = codeMap[os];
+}
+function copyCode() {
+  const text = document.getElementById('install-code').innerText;
+  navigator.clipboard.writeText(text).then(()=>{
+    const btn = document.querySelector('.copy-btn');
+    btn.textContent='copied!'; btn.style.color='var(--green)';
+    setTimeout(()=>{ btn.textContent='copy'; btn.style.color=''; },2000);
+  });
+}
+
+/* ── Changelog ── */
+const changelogs = {
+  v1_0: {
+    version: 'v1.0.0',
+    date: '20 May 2026',
+    items: [
+      'Full cross-platform release — Linux, macOS, Windows',
+      'Hybrid FAISS + SQLite memory engine shipped stable',
+      'Wayland native screenshot portal integration',
+      'Smart routing between Gemini 2.5 and Groq',
+      'ThinkingSpinner UX with in-place clearing',
+      'Multi-step terminal automation engine',
+      'Hinglish response mode polished',
+      'MIT License — open source release',
+    ]
+  },
+  v0_4: {
+    version: 'v0.4.0',
+    date: '08 May 2026',
+    items: [
+      'Added plugin loader architecture',
+      'Improved terminal command parser',
+      'Faster FAISS memory loading on startup',
+      'Fixed Wayland DBus screenshot bugs',
+      'Added battery and system info commands',
+      'Brave browser automation support',
+    ]
+  },
+  v0_3: {
+    version: 'v0.3.0',
+    date: '22 Apr 2026',
+    items: [
+      'Real-time Vision capability via Llama 4 Scout',
+      'Screenshot-to-analysis pipeline',
+      'Weather command via wttr.in integration',
+      'SQLite persistent fact store added',
+      'Initial Groq routing for fast responses',
+    ]
+  },
+  v0_2: {
+    version: 'v0.2.0',
+    date: '05 Apr 2026',
+    items: [
+      'Initial FAISS vector memory with sentence-transformers',
+      'First working terminal automation (xdotool)',
+      'Basic Gemini API integration',
+      'News API integration',
+      'Core intent routing system',
+    ]
+  }
+};
+function switchVersion(el, key) {
+  document.querySelectorAll('.v-item').forEach(v=>v.classList.remove('active'));
+  el.classList.add('active');
+  renderChangelog(key);
+}
+function renderChangelog(key) {
+  const d = changelogs[key];
+  const detail = document.getElementById('changelog-detail');
+  detail.innerHTML = `
+    <div class="cd-version">${d.version}</div>
+    <div class="cd-date">${d.date}</div>
+    <ul class="cd-list">
+      ${d.items.map(i=>`<li>${i}</li>`).join('')}
+    </ul>`;
+}
+renderChangelog('v1_0');
+</script>
+</body>
+</html>
