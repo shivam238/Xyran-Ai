@@ -79,45 +79,41 @@ def is_greeting(user_input):
 
 
 def is_self_identity_request(user_input):
-    """Detect questions about Xyran's own identity, creator, features, tech stack, or recent updates."""
+    """Detect direct questions about Xyran's own identity, creator, features, tech stack, or recent updates."""
     lowered = user_input.lower().strip()
-    identity_phrases = [
-        # Who are you
-        "tu kya hai", "tum kya ho", "aap kya hain", "you are who", "who are you",
-        "what are you", "apne baare mein batao", "apne baare me btao",
-        "khud ke baare mein batao", "khud ke baare me btao",
-        "apna parichay do", "apna introduction do",
-        # Creator / Made by
-        "kisne banaya", "kisne bnaya", "kisne create kiya", "who made you",
-        "who created you", "who built you", "tujhe kisne banaya",
-        "tumhe kisne banaya", "creator kaun hai", "creator kon hai",
-        "banane wala kaun", "developer kaun hai", "developer kon hai",
-        "shivam", "shivam kumar", "shivam mahto",
-        "kaise banaya", "kese banaya", "kisne design kiya",
-        # Features & abilities
-        "kya kya kar sakta hai", "kya kya kr sakta hai", "teri abilities",
-        "teri capabilities", "teri features", "tere features",
-        "kya features hain", "kya features hai", "what can you do",
-        "tumhari khaasiyat", "teri khasiyat", "teri khoobiyan",
-        # Tech stack
-        "kaise bana hai", "kese bana hai", "kis coding se bana", "kis language mein bana",
-        "kaunsi language", "konsi language", "tech stack",
-        "python se bana", "built with what", "kaunsi technology",
-        "groq", "gemini", "faiss", "llama", "sentence transformer",
-        "kis cheez se bana", "kaise kaam karta hai internally",
-        # Version & History
-        "konsa version hai", "kaun sa version", "version kya hai",
-        "pehle kesa tha", "pehle kaisa tha", "pehle kya tha",
-        "kab bana", "kab banaya", "when were you created", "kaise evolve kiya",
-        # Self Codebase / Git Updates (strictly self-referential)
-        "mere updates", "tere updates", "codebase status", "apne updates",
-        "mere commits", "tere commits", "apne changes", "git log", "git status",
-    ]
-    # Exact single word check to avoid generic triggers on things like "updates of spotify"
-    exact_match = lowered in {
-        "updates", "update", "commits", "changelog", "version", "history", "git"
+    
+    # 1. Clean punctuation
+    cleaned = re.sub(r"[?.!,]", "", lowered).strip()
+    
+    # 2. Strict exact single words / short queries
+    exact_queries = {
+        "tu kya hai", "tum kya ho", "aap kya hain", "who are you", "what are you",
+        "who made you", "who created you", "who built you", "tujhe kisne banaya",
+        "tumhe kisne banaya", "kisne banaya", "kisne bnaya", "creator kaun hai",
+        "creator kon hai", "developer kaun hai", "developer kon hai",
+        "kaise bana hai", "kese bana hai", "tech stack", "what can you do",
+        "kya kya kar sakta hai", "kya kya kr sakta hai", "updates", "update",
+        "git log", "git status", "codebase status", "tere updates", "apne updates"
     }
-    return exact_match or any(phrase in lowered for phrase in identity_phrases)
+    if cleaned in exact_queries:
+        return True
+        
+    # 3. Direct start/end patterns (anchored to prevent false triggers in jokes/stories)
+    direct_patterns = [
+        r"^(tu|tum|aap|xyran)\s+(kon|kaun|kya)\s+(hai|ho|hain)$",
+        r"^(tujhe|tumhe|aapko)\s+(kisne|kise)\s+(banaya|bnaya|create kiya|built|design kiya)",
+        r"^(who|what)\s+(made|created|built|designed)\s+(you)$",
+        r"^(apne|khud|tere|apna)\s+(baare|intro|introduction|parichay)\s+(mein|me)?\s*(batao|btao|bata|do|tell)$",
+        r"^(kya\s+)?(abilities|capabilities|features|khasiyat|khoobiyan|features)\s+(hain|hai|batao|btao)$",
+        r"^(kaise|kese|kis coding se)\s+bana\s+hai$",
+        r"^(tere|apne|codebase)\s+(updates|changes|commits|status)\s*(kya\s+)?(hain|hai|batao|btao)?$",
+    ]
+    
+    for pat in direct_patterns:
+        if re.search(pat, cleaned):
+            return True
+            
+    return False
 
 
 def get_dynamic_git_and_code_info():
