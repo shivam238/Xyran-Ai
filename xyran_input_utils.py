@@ -93,7 +93,9 @@ def is_self_identity_request(user_input):
         "creator kon hai", "developer kaun hai", "developer kon hai",
         "kaise bana hai", "kese bana hai", "tech stack", "what can you do",
         "kya kya kar sakta hai", "kya kya kr sakta hai", "updates", "update",
-        "git log", "git status", "codebase status", "tere updates", "apne updates"
+        "git log", "git status", "codebase status", "tere updates", "apne updates",
+        "bata sab", "batao sab", "sab bata", "sab batao", "each and everything", "poora bata", "all features",
+        "bata sab kuch", "sab kuch bata", "sab kuch batao", "poora batao", "poori detail mein batao"
     }
     if cleaned in exact_queries:
         return True
@@ -107,6 +109,9 @@ def is_self_identity_request(user_input):
         r"^(kya\s+)?(abilities|capabilities|features|khasiyat|khoobiyan|features)\s+(hain|hai|batao|btao)$",
         r"^(kaise|kese|kis coding se)\s+bana\s+hai$",
         r"^(tere|apne|codebase)\s+(updates|changes|commits|status)\s*(kya\s+)?(hain|hai|batao|btao)?$",
+        r"^(bata|batao|tell)\s+(sab|everything|all|each and everything)$",
+        r"^(sab|everything|all)\s+(bata|batao|tell)$",
+        r"^(mujhe\s+)?(iss|is)\s+(ai|bot)\s+ke\s+baare?\s+(me|mein)\s+(each\s+and\s+everything|sab\s+kuch)\s+(batao|btao|bata|tell)$",
     ]
     
     for pat in direct_patterns:
@@ -226,6 +231,37 @@ def get_self_identity_reply(user_input):
             reply += dyn_str
             return reply
         return "Abhi tak koi naye updates nahi mile hain, main stable v1.0 version par run kar raha hoon! 🚀"
+
+    # Comprehensive "each and everything" request
+    if any(w in lowered for w in ["bata sab", "batao sab", "sab bata", "sab batao", "everything", "each and", "poora bata", "all features"]):
+        history_str = (
+            "\n\n⏳ *Mera Evolution (Itihaas):*\n"
+            "- **v0 (Early):** Ek simple single-file chatbot jo sirf basic Q&A karta tha.\n"
+            "- **v0.5:** Terminal app control, custom app launching, aur automatic screenshots capabilities.\n"
+            "- **v1.0 (Current):** Full modular hybrid agent! Dual memory, real-time vision (Wayland), system controls, live weather/news, aur self-aware code telemetry."
+        )
+        tech_str = (
+            "\n\n🛠️ *Mera Tech Stack (Python 3.10+):*\n"
+            "- **LLMs:** Groq API (llama-3.3-70b/llama-4-scout) + Google Gemini Pro\n"
+            "- **Memory:** FAISS vector similarity database + SQLite3 local storage\n"
+            "- **Vision:** Llama 4 Scout Vision model via Wayland Portal screenshot capture\n"
+            "- **Web Services:** Zero-API weather (wttr.in) aur NewsAPI headlines"
+        )
+        features_str = (
+            "\n\n💪 *Meri Top Capabilities (Features):*\n"
+            "- **Dual Memory:** Aapki har ek detail aur preference yaad rakhta hoon.\n"
+            "- **System Controls:** Volume, brightness, DND toggle, aur keyboard backlight set kar sakta hoon.\n"
+            "- **Multi-Step Engine:** Ek saath 2-10 tasks pipeline mein run karta hoon.\n"
+            "- **Image Generation:** Aapke prompt par custom AI images generate kar sakta hoon."
+        )
+        
+        reply = (
+            f"Theek hai, poora detail mein suniye! 🌌 Main, {cfg.get('name', 'Xyran') if cfg else 'Xyran'}, ek highly self-aware "
+            f"locally-integrated modular agent hoon. Mujhe {cfg.get('created_by', 'Shivam Kumar Mahto') if cfg else 'Shivam Kumar Mahto'} "
+            f"ne May 2026 mein design kiya tha."
+            f"{history_str}{tech_str}{features_str}"
+        )
+        return reply
 
     # Creator questions
     if any(w in lowered for w in ["kisne banaya", "kisne bnaya", "kisne create", "who made", "who created", "who built", "creator", "developer", "shivam", "design kiya"]):
