@@ -2,6 +2,21 @@ import math
 import re
 from memory_db import get_all_memory
 
+COMMON_CHITCHAT = {
+    "hi", "hello", "hey", "exit", "quit", "ok", "yes", "no", "sahi", "haan", "ha", 
+    "bye", "thanks", "thank you", "dhanyavad", "shukriya", "nice", "good", "bad",
+    "kya", "kyu", "kyon", "kab", "kahan", "kaise", "aur", "and", "or", "what", "who", "why"
+}
+
+def is_chitchat_or_short(text):
+    clean = text.lower().strip()
+    if len(clean) < 8:
+        return True
+    words = set(clean.split())
+    if words.issubset(COMMON_CHITCHAT):
+        return True
+    return False
+
 INDEXED_MEMORIES = []
 ALL_WORDS = set()
 

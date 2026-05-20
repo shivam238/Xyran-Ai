@@ -1,6 +1,13 @@
 {
-  "facts": [],
-  "preferences": [],
-  "tasks": [],
-  "projects": []
+    "facts": {
+        "age": {
+            "value": "18"
+        },
+        "dog_name": {
+            "value": "Sheru"
+        }
+    },
+    "preferences": [],
+    "tasks": [],
+    "projects": []
 }

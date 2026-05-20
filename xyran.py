@@ -1,5 +1,8 @@
 import os
-from xyran_memory import remember, recall
+from xyran_memory import remember, recall, format_memory_for_ai
+from memory_db import init_db, migrate_old_neural_memories, insert_memory
+from vector_memory import build_index, search_memory, is_chitchat_or_short
+from xyran_brain import brain
 from groq import Groq, RateLimitError
 from config import (
     AI_NAME,
@@ -73,6 +76,9 @@ news_manager = NewsManager(
 
 
 def main():
+    init_db()
+    migrate_old_neural_memories()
+    build_index()
     news_manager.load_state()
     print(f"""
 ╔══════════════════════════════════════════╗
@@ -92,6 +98,18 @@ def main():
                 print("[Xyran] Theek hai. Phir milenge.")
                 break
 
+            if user_input.lower().startswith("remember "):
+                content = user_input[9:].strip()
+                insert_memory("facts", content)
+                build_index()
+                print(f"[{AI_NAME}] Yaad rakh liya: {content}")
+                continue
+
+            brain_result = brain(user_input, runtime_state)
+            if brain_result:
+                print(f"[{AI_NAME}] {brain_result}")
+                continue
+
             if handle_direct_action(user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai):
                 runtime_state.last_input_used_vision = False
                 continue
@@ -101,6 +119,27 @@ def main():
                 or (runtime_state.last_input_used_vision and is_vision_followup(user_input))
                 or (runtime_state.vision_followup_turns_left > 0 and is_ambiguous_short_followup(user_input))
             )
+
+            neural_matches = []
+            if not is_chitchat_or_short(user_input):
+                neural_matches = search_memory(user_input, top_n=3)
+
+            neural_context = ""
+            if neural_matches:
+                neural_context = "PAST CONVERSATIONS / MEMORIES:\n" + "\n".join(f"- {m}" for m in neural_matches)
+
+            memory_context = format_memory_for_ai()
+
+            prompt_ext = []
+            if memory_context:
+                prompt_ext.append("FACTS / PREFERENCES:\n" + memory_context)
+            if neural_context:
+                prompt_ext.append(neural_context)
+
+            if prompt_ext:
+                ai.system_prompt = SYSTEM_PROMPT + "\n\n" + "\n\n".join(prompt_ext)
+            else:
+                ai.system_prompt = SYSTEM_PROMPT
 
             if use_vision:
                 print("[Xyran] Screen dekh raha hoon...")
@@ -118,6 +157,11 @@ def main():
                 runtime_state.last_input_used_vision = False
                 if runtime_state.vision_followup_turns_left > 0:
                     runtime_state.vision_followup_turns_left -= 1
+
+            if reply and not is_chitchat_or_short(user_input):
+                if "AI providers se reply nahi aa paya" not in reply:
+                    insert_memory("conversations", f"User asked: {user_input} -> Xyran replied: {reply}")
+                    build_index()
 
             process_response(reply, run_command, command_failed, ai.summarize_output, clean_json, runtime_state)
 

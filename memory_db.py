@@ -49,3 +49,44 @@ def remember(category, content):
     insert_memory(category, content)
 
 
+def migrate_old_neural_memories():
+    import json
+    neural_file = os.path.join(DB_DIR, "neural_memory.json")
+    migrated_flag = os.path.join(DB_DIR, ".migrated")
+    
+    if os.path.exists(migrated_flag):
+        return
+        
+    if not os.path.exists(neural_file):
+        return
+        
+    try:
+        with open(neural_file, "r") as f:
+            data = json.load(f)
+        
+        if not data:
+            with open(migrated_flag, "w") as f:
+                f.write("done")
+            return
+            
+        init_db()
+        conn = sqlite3.connect(DB_FILE)
+        c = conn.cursor()
+        
+        for item in data:
+            if isinstance(item, dict) and "text" in item:
+                text = item["text"].strip()
+                if text:
+                    c.execute('INSERT INTO memories (category, content) VALUES (?, ?)', ("conversations", text))
+                    
+        conn.commit()
+        conn.close()
+        
+        with open(migrated_flag, "w") as f:
+            f.write("done")
+        print(">>> Dynamic Migration: Imported old neural memories into SQLite memory database! ✅")
+    except Exception as e:
+        print(f"Warning: Failed to migrate old neural memories: {e}")
+
+
+

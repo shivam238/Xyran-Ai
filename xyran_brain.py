@@ -200,7 +200,7 @@ def brain(user_input, runtime_state=None):
             learn_from_interaction(user_input, "get_user_name", success=True)
             return f"Aapka naam {name} hai"
         learn_from_interaction(user_input, "get_user_name", success=False)
-        return "Mujhe aapka naam nahi pata"
+        return None
 
     # -------------------------
     # GET USER AGE
@@ -211,7 +211,7 @@ def brain(user_input, runtime_state=None):
             learn_from_interaction(user_input, "get_user_age", success=True)
             return f"Aapki age {age} hai"
         learn_from_interaction(user_input, "get_user_age", success=False)
-        return "Mujhe aapki age nahi pata"
+        return None
 
     # -------------------------
     # STORE AGE (with confirmation)

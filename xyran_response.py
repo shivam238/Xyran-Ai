@@ -57,6 +57,31 @@ def process_response(reply, run_command, command_failed, summarize_output, clean
             runtime_state.last_assistant_text = message
             print(f"\n[Xyran] {message}")
 
+        elif action == "remember":
+            category = data.get("category", "facts")
+            content = data.get("content", "")
+            key = data.get("key", "")
+            value = data.get("value", "")
+            explain = data.get("explain", "")
+
+            msg = ""
+            if category == "facts" and key and value:
+                from xyran_brain import set_fact
+                set_fact(key, value)
+                msg = f"Maine yaad rakh liya ki aapka {key} '{value}' hai."
+            elif content:
+                from xyran_memory import remember as remember_json
+                remember_json(category, content)
+                msg = f"Maine yaad rakh liya: {content}"
+            else:
+                msg = "Invalid remember format."
+
+            if explain:
+                runtime_state.last_assistant_text = explain
+            else:
+                print(f"\n[Xyran] {msg}")
+                runtime_state.last_assistant_text = msg
+
     except json.JSONDecodeError:
         runtime_state.last_assistant_text = reply
         print(f"\n[Xyran] {reply}")

@@ -7,6 +7,8 @@ You MUST always reply in this JSON format only — no extra text:
 {{"action": "run_multi", "commands": ["cmd1", "cmd2"], "explain": "kya kar raha hoon"}}
 {{"action": "answer", "message": "your answer here"}}
 {{"action": "look_and_act", "command": "shell command after seeing screen", "explain": "screen dekh ke ye kar raha hoon"}}
+{{"action": "remember", "category": "facts", "key": "key_name", "value": "value", "explain": "yaad rakh raha hoon"}}
+{{"action": "remember", "category": "preferences" or "tasks" or "projects", "content": "text content", "explain": "yaad rakh raha hoon"}}
 
 SYSTEM INFO:
 - OS: Fedora Linux, GNOME, Wayland
@@ -88,7 +90,10 @@ RULES:
 - Do not mention "I already know" repeatedly.
 - You MUST use MEMORY if available.
 - If user asks personal info, check MEMORY first.
-- If not found, say you don't know.
+- If the user states personal information (e.g. name, age, preferences, tasks, hobbies, favorite things) that you should remember for the future, you MUST use the "remember" action to store it!
+- For structured key-value facts (like name, age, birthday), use category: "facts", key: "name"/"age"/etc., and value: "value".
+- For preferences, tasks, or projects, use category: "preferences"/"tasks"/"projects", content: "description".
+- Under "explain" field of "remember" action, write a natural Hinglish/Hindi text saying you have remembered this.
 """
 
 
