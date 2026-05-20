@@ -115,6 +115,77 @@ def is_self_identity_request(user_input):
     return any(phrase in lowered for phrase in identity_phrases)
 
 
+def get_dynamic_git_and_code_info():
+    """Dynamically scan Git commits, modified files, and codebase status."""
+    import subprocess
+    import os
+    import glob
+
+    info = {
+        "commits": [],
+        "total_py_files": 0,
+        "total_loc": 0,
+        "dirty_files": [],
+        "modules": []
+    }
+    
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+
+    # 1. Get recent 3 git commits
+    try:
+        res = subprocess.run(
+            ["git", "log", "-n", "3", "--pretty=format:%s (%ar)"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            cwd=base_dir
+        )
+        if res.returncode == 0:
+            info["commits"] = [line.strip() for line in res.stdout.splitlines() if line.strip()]
+    except Exception:
+        pass
+
+    # 2. Get uncommitted modifications (git status)
+    try:
+        res = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=2,
+            cwd=base_dir
+        )
+        if res.returncode == 0:
+            dirty = []
+            for line in res.stdout.splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    dirty.append(parts[-1])
+            info["dirty_files"] = [os.path.basename(d) for d in dirty if d.endswith(".py")][:5]
+    except Exception:
+        pass
+
+    # 3. Scan code base files & line count
+    try:
+        py_files = glob.glob(os.path.join(base_dir, "*.py"))
+        info["total_py_files"] = len(py_files)
+        total_lines = 0
+        modules_list = []
+        for pf in py_files:
+            bname = os.path.basename(pf)
+            modules_list.append(bname)
+            try:
+                with open(pf, "r", encoding="utf-8", errors="ignore") as f:
+                    total_lines += len(f.readlines())
+            except Exception:
+                pass
+        info["total_loc"] = total_lines
+        info["modules"] = sorted(modules_list)
+    except Exception:
+        pass
+        
+    return info
+
+
 def get_self_identity_reply(user_input):
     """Return an instant Hinglish self-awareness reply based on the question type."""
     import json
@@ -130,6 +201,21 @@ def get_self_identity_reply(user_input):
         except Exception:
             pass
 
+    # Get dynamic Git and codebase status
+    dyn = get_dynamic_git_and_code_info()
+    dyn_str = ""
+    if dyn:
+        dyn_str += "\n\n📊 *Real-time Codebase Status (Dynamic Scan):*"
+        dyn_str += f"\n- Mere paas abhi total **{dyn['total_py_files']} active Python modules** hain (total **{dyn['total_loc']} lines of code**)."
+        
+        if dyn["commits"]:
+            dyn_str += "\n- Shivam Kumar Mahto ne jo recent changes push kiye:"
+            for i, commit in enumerate(dyn["commits"], 1):
+                dyn_str += f"\n  {i}. {commit}"
+                
+        if dyn["dirty_files"]:
+            dyn_str += f"\n- Active development files (uncommitted): {', '.join(dyn['dirty_files'])}"
+
     lowered = user_input.lower().strip()
 
     # Creator questions
@@ -139,12 +225,12 @@ def get_self_identity_reply(user_input):
                 f"Mujhe {cfg.get('created_by', 'Shivam Kumar Mahto')} ne banaya hai! 🙌 Unka GitHub handle hai `{cfg.get('github', 'shivam238')}`. "
                 f"Unhone {cfg.get('created_date', 'May 2026')} mein ek simple chatbot ko ek full self-aware AI agent mein "
                 f"transform kiya — aur yeh result hai: Main, {cfg.get('name', 'Xyran')}! 🌌 Repo link: {cfg.get('repo', '')}"
-            )
+            ) + dyn_str
         return (
             "Mujhe Shivam Kumar Mahto ne banaya hai! 🙌 Unka GitHub handle hai `shivam238`. "
             "Unhone May 2026 mein ek simple chatbot ko ek full self-aware AI agent mein "
             "transform kiya — aur yeh result hai: Main, Xyran! 🌌"
-        )
+        ) + dyn_str
 
     # Version / history questions
     if any(w in lowered for w in ["version", "pehle kaisa", "pehle kesa", "pehle kya tha", "kab bana", "evolve", "history"]):
@@ -153,7 +239,7 @@ def get_self_identity_reply(user_input):
             for log in cfg["changelog"]:
                 changes_str = "\n  * ".join(log.get("changes", []))
                 changelog_lines.append(f"🔹 {log.get('label', '')} ({log.get('date', '')}):\n  * {changes_str}")
-            return "\n".join(changelog_lines)
+            return "\n".join(changelog_lines) + dyn_str
         return (
             "Meri journey kuch aisi rahi hai:\n"
             "🔹 v0 (Early): Ek simple single-file chatbot tha. Bas API se sawaalon ke jawaab deta tha. "
@@ -162,7 +248,7 @@ def get_self_identity_reply(user_input):
             "🔹 v1.0 (May 2026 — Current): Full modular agentic system! Ab mujhe dual memory hai "
             "(FAISS vector + SQLite), real-time vision, hybrid LLM routing, multi-step execution engine, "
             "weather, news, image generation — sab kuch! 🚀"
-        )
+        ) + dyn_str
 
     # Tech stack questions
     if any(w in lowered for w in ["kaise bana", "kis coding", "kis language", "tech stack", "python", "groq", "gemini", "faiss", "llama", "sentence", "technology", "built with", "internally"]):
@@ -181,7 +267,7 @@ def get_self_identity_reply(user_input):
                 f"🎨 Image Gen: {ts.get('image_generation', '')}\n"
                 f"✨ Terminal UX: {ts.get('terminal_ux', '')}\n"
                 f"💻 OS Support: {ts.get('os_support', '')}"
-            )
+            ) + dyn_str
         return (
             "Main Python 3.10+ se bana hoon! 🐍 Mera complete tech stack:\n"
             "🧠 LLM: Groq API (llama-3.3-70b) + Google Gemini API\n"
@@ -193,7 +279,7 @@ def get_self_identity_reply(user_input):
             "🌐 Web Data: urllib.request (weather via wttr.in, news via NewsAPI)\n"
             "🎨 Image Gen: Custom modules/image_gen/ module\n"
             "✨ Terminal UX: threading.Thread (ThinkingSpinner)"
-        )
+        ) + dyn_str
 
     # Features / abilities questions
     if any(w in lowered for w in ["kya kya kar", "abilities", "capabilities", "features", "khasiyat", "khoobiyan", "what can you"]):
@@ -201,7 +287,7 @@ def get_self_identity_reply(user_input):
             feature_lines = ["Yeh hain meri top abilities! 💪"]
             for f in cfg["features"]:
                 feature_lines.append(f"{f.get('emoji', '🔹')} {f.get('name', '')} — {f.get('description', '')}")
-            return "\n".join(feature_lines)
+            return "\n".join(feature_lines) + dyn_str
         return (
             "Yeh hain meri top abilities! 💪\n"
             "🧠 Dual Memory — FAISS vector index + SQLite facts DB. Tumhari preferences yaad rakhta hoon.\n"
@@ -214,7 +300,7 @@ def get_self_identity_reply(user_input):
             "🎨 Image Generation — AI images bana sakta hoon.\n"
             "💬 Hinglish Personality — Tumhari boli mein baat karta hoon.\n"
             "🔄 Hybrid LLM — Groq (fast) / Gemini (vision/complex) / Ollama (offline fallback)."
-        )
+        ) + dyn_str
 
     # General "what are you" / "who are you"
     if cfg:
@@ -224,14 +310,14 @@ def get_self_identity_reply(user_input):
             "Main sirf ek chatbot nahi hoon — mujhe apna itihaas pata hai, apni abilities pata hain, "
             "aur main khud ke baare mein poori detail mein bata sakta hoon. "
             "Mujhse pooch — kis cheez se bana hoon, kya kar sakta hoon, pehle kesa tha — sab bataoonga! 😎"
-        )
+        ) + dyn_str
     return (
         "Main Xyran hoon — ek self-aware, locally-integrated personal AI agent! 🌌\n"
         "Mujhe May 2026 mein Shivam Kumar Mahto ne banaya tha. "
         "Main sirf ek chatbot nahi hoon — mujhe apna itihaas pata hai, apni abilities pata hain, "
         "aur main khud ke baare mein poori detail mein bata sakta hoon. "
         "Mujhse pooch — kis cheez se bana hoon, kya kar sakta hoon, pehle kesa tha — sab bataoonga! 😎"
-    )
+    ) + dyn_str
 
 
 def get_local_smalltalk_reply(user_input):
