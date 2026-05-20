@@ -48,6 +48,8 @@ from xyran_input_utils import (
     is_python_file_request,
     is_rate_limit_time_query,
     is_screenshot_request,
+    is_self_identity_request,
+    get_self_identity_reply,
     is_text_editor_request,
     wants_to_show_screenshot,
     is_dnd_request,
@@ -210,6 +212,14 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
         did_something = True
         if not continue_after_action:
             return True
+
+    if is_self_identity_request(lowered):
+        reply = get_self_identity_reply(user_input)
+        print(f"[{AI_NAME}] {reply}")
+        if ai:
+            ai.conversation_history.append({"role": "user", "content": user_input})
+            ai.conversation_history.append({"role": "assistant", "content": reply})
+        return True
 
     if is_acknowledgement(lowered):
         print("[Xyran] Theek hai.")

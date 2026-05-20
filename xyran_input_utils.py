@@ -78,6 +78,108 @@ def is_greeting(user_input):
     return compact in {"hi", "hello", "hey"}
 
 
+def is_self_identity_request(user_input):
+    """Detect questions about Xyran's own identity, creator, features, or tech stack."""
+    lowered = user_input.lower().strip()
+    identity_phrases = [
+        # Who are you
+        "tu kya hai", "tum kya ho", "aap kya hain", "you are who", "who are you",
+        "what are you", "apne baare mein batao", "apne baare me btao",
+        "khud ke baare mein batao", "khud ke baare me btao",
+        "apna parichay do", "apna introduction do",
+        # Creator / Made by
+        "kisne banaya", "kisne bnaya", "kisne create kiya", "who made you",
+        "who created you", "who built you", "tujhe kisne banaya",
+        "tumhe kisne banaya", "creator kaun hai", "creator kon hai",
+        "banane wala kaun", "developer kaun hai", "developer kon hai",
+        "shivam", "shivam kumar", "shivam mahto",
+        # Features & abilities
+        "kya kya kar sakta hai", "kya kya kr sakta hai", "teri abilities",
+        "teri capabilities", "teri features", "tere features",
+        "kya features hain", "kya features hai", "what can you do",
+        "tumhari khaasiyat", "teri khasiyat", "teri khoobiyan",
+        # Tech stack
+        "kaise bana hai", "kis coding se bana", "kis language mein bana",
+        "kaunsi language", "konsi language", "tech stack",
+        "python se bana", "built with what", "kaunsi technology",
+        "groq", "gemini", "faiss", "llama", "sentence transformer",
+        "kis cheez se bana", "kaise kaam karta hai internally",
+        # Version & History
+        "konsa version hai", "kaun sa version", "version kya hai",
+        "pehle kesa tha", "pehle kaisa tha", "pehle kya tha",
+        "kab bana", "kab banaya", "when were you created", "kaise evolve kiya",
+        # General self-reflection
+        "xyran kya hai", "xyran kon hai", "xyran kaun hai",
+        "tere baare mein batao", "tere baare me btao",
+    ]
+    return any(phrase in lowered for phrase in identity_phrases)
+
+
+def get_self_identity_reply(user_input):
+    """Return an instant Hinglish self-awareness reply based on the question type."""
+    lowered = user_input.lower().strip()
+
+    # Creator questions
+    if any(w in lowered for w in ["kisne banaya", "kisne bnaya", "kisne create", "who made", "who created", "who built", "creator", "developer", "shivam"]):
+        return (
+            "Mujhe Shivam Kumar Mahto ne banaya hai! 🙌 Unka GitHub handle hai `shivam238`. "
+            "Unhone May 2026 mein ek simple chatbot ko ek full self-aware AI agent mein "
+            "transform kiya — aur yeh result hai: Main, Xyran! 🌌"
+        )
+
+    # Version / history questions
+    if any(w in lowered for w in ["version", "pehle kaisa", "pehle kesa", "pehle kya tha", "kab bana", "evolve", "history"]):
+        return (
+            "Meri journey kuch aisi rahi hai:\n"
+            "🔹 v0 (Early): Ek simple single-file chatbot tha. Bas API se sawaalon ke jawaab deta tha. "
+            "Na koi memory, na koi automation, na vision.\n"
+            "🔹 v0.5: Basic shell command execution add hua. Apps khol sakta tha, screenshots le sakta tha.\n"
+            "🔹 v1.0 (May 2026 — Current): Full modular agentic system! Ab mujhe dual memory hai "
+            "(FAISS vector + SQLite), real-time vision, hybrid LLM routing, multi-step execution engine, "
+            "weather, news, image generation — sab kuch! 🚀"
+        )
+
+    # Tech stack questions
+    if any(w in lowered for w in ["kaise bana", "kis coding", "kis language", "tech stack", "python", "groq", "gemini", "faiss", "llama", "sentence", "technology", "built with", "internally"]):
+        return (
+            "Main Python 3.10+ se bana hoon! 🐍 Mera complete tech stack:\n"
+            "🧠 LLM: Groq API (llama-3.3-70b) + Google Gemini API\n"
+            "👁️ Vision: Llama 4 Scout Vision model (Groq)\n"
+            "🗃️ Vector Memory: FAISS + SentenceTransformers (all-MiniLM-L6-v2 from HuggingFace)\n"
+            "💾 Relational Memory: SQLite (Python sqlite3)\n"
+            "📸 Screenshots: D-Bus / Freedesktop XDG Portal (Wayland native)\n"
+            "🚀 App Launch: gtk-launch + subprocess.Popen\n"
+            "🌐 Web Data: urllib.request (weather via wttr.in, news via NewsAPI)\n"
+            "🎨 Image Gen: Custom modules/image_gen/ module\n"
+            "✨ Terminal UX: threading.Thread (ThinkingSpinner)"
+        )
+
+    # Features / abilities questions
+    if any(w in lowered for w in ["kya kya kar", "abilities", "capabilities", "features", "khasiyat", "khoobiyan", "what can you"]):
+        return (
+            "Yeh hain meri top abilities! 💪\n"
+            "🧠 Dual Memory — FAISS vector index + SQLite facts DB. Tumhari preferences yaad rakhta hoon.\n"
+            "👁️ Real-Time Vision — Screen dekh sakta hoon via Wayland native portal + Vision LLM.\n"
+            "⚡ Smart Routing — Simple tasks ke liye LLM bypass, complex ke liye full AI brain.\n"
+            "🖥️ System Control — Volume, brightness, DND, keyboard backlight, apps open/close.\n"
+            "🌐 Multi-step Engine — 2-10 actions ek saath execute karta hoon with timing.\n"
+            "🌦️ Live Weather — wttr.in se real-time mausam (no API key needed).\n"
+            "📰 News — NewsAPI se live headlines, category/country filter ke saath.\n"
+            "🎨 Image Generation — AI images bana sakta hoon.\n"
+            "💬 Hinglish Personality — Tumhari boli mein baat karta hoon.\n"
+            "🔄 Hybrid LLM — Groq (fast) / Gemini (vision/complex) / Ollama (offline fallback)."
+        )
+
+    # General "what are you" / "who are you"
+    return (
+        "Main Xyran hoon — ek self-aware, locally-integrated personal AI agent! 🌌\n"
+        "Mujhe May 2026 mein Shivam Kumar Mahto ne banaya tha. "
+        "Main sirf ek chatbot nahi hoon — mujhe apna itihaas pata hai, apni abilities pata hain, "
+        "aur main khud ke baare mein poori detail mein bata sakta hoon. "
+        "Mujhse pooch — kis cheez se bana hoon, kya kar sakta hoon, pehle kesa tha — sab bataoonga! 😎"
+    )
+
+
 def get_local_smalltalk_reply(user_input):
     lowered = user_input.lower().strip()
 
