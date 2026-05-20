@@ -111,6 +111,11 @@ def route_intent(text, prev_action_category=None):
     Gatekeeper: decides where to send the user input.
     Returns one of: "LLM_PLANNER", "DIRECT_HANDLER", "LLM_FALLBACK"
     """
+    # Self-identity queries always go directly to DIRECT_HANDLER (fast offline responder)
+    from xyran_input_utils import is_self_identity_request
+    if is_self_identity_request(text):
+        return "DIRECT_HANDLER"
+
     # Expose screen brightness direct routing immediately
     from xyran_input_utils import is_screen_brightness_request, is_weather_request
     if is_screen_brightness_request(text, prev_action_category=prev_action_category):
