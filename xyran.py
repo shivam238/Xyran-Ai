@@ -1,4 +1,7 @@
 import os
+import sys
+import threading
+import time
 from xyran_memory import remember, recall, format_memory_for_ai
 from memory_db import init_db, migrate_old_neural_memories, insert_memory
 from vector_memory import build_index, search_memory, is_chitchat_or_short
@@ -76,6 +79,36 @@ news_manager = NewsManager(
 )
 
 
+class ThinkingSpinner:
+    def __init__(self, message="[Xyran] Thinking..."):
+        self.message = message
+        self.spinner_chars = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+        self.stop_event = threading.Event()
+        self.thread = None
+
+    def _spin(self):
+        idx = 0
+        while not self.stop_event.is_set():
+            char = self.spinner_chars[idx % len(self.spinner_chars)]
+            sys.stdout.write(f"\r{self.message} {char}")
+            sys.stdout.flush()
+            idx += 1
+            time.sleep(0.08)
+
+    def __enter__(self):
+        self.thread = threading.Thread(target=self._spin)
+        self.thread.daemon = True
+        self.thread.start()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.stop_event.set()
+        if self.thread:
+            self.thread.join()
+        sys.stdout.write("\r" + " " * (len(self.message) + 10) + "\r")
+        sys.stdout.flush()
+
+
 def main():
     init_db()
     migrate_old_neural_memories()
@@ -151,15 +184,18 @@ def main():
                 print("[Xyran] Screen dekh raha hoon...")
                 img_path, err = take_screenshot()
                 if img_path:
-                    reply = ai.ask_with_image(user_input, img_path)
+                    with ThinkingSpinner(f"[{AI_NAME}] Thinking..."):
+                        reply = ai.ask_with_image(user_input, img_path)
                     os.remove(img_path)
                 else:
                     print(f"[Xyran] Screenshot nahi le paya: {err}")
-                    reply = ai.ask(user_input)
+                    with ThinkingSpinner(f"[{AI_NAME}] Thinking..."):
+                        reply = ai.ask(user_input)
                 runtime_state.last_input_used_vision = True
                 runtime_state.vision_followup_turns_left = 2
             else:
-                reply = ai.ask(user_input)
+                with ThinkingSpinner(f"[{AI_NAME}] Thinking..."):
+                    reply = ai.ask(user_input)
                 runtime_state.last_input_used_vision = False
                 if runtime_state.vision_followup_turns_left > 0:
                     runtime_state.vision_followup_turns_left -= 1
