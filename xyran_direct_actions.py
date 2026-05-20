@@ -1,6 +1,9 @@
+import json
 import os
 import re
 import time
+import urllib.parse
+import urllib.request
 from datetime import datetime
 from modules.image_gen.handler import handle_image
 
@@ -56,7 +59,64 @@ from xyran_input_utils import (
     extract_screen_brightness_percent,
     percent_to_screen_raw,
     SCREEN_BACKLIGHT_PATH,
+    is_weather_request,
+    extract_weather_city,
 )
+
+
+# ---------------------------------------------------------------------------
+# Weather fetcher using wttr.in (no API key needed)
+# ---------------------------------------------------------------------------
+
+def fetch_weather(city=None):
+    """Fetch weather from wttr.in and return a Hinglish formatted string."""
+    location = city if city else ""
+    url = f"https://wttr.in/{urllib.parse.quote(location)}?format=j1"
+    try:
+        req = urllib.request.Request(url, headers={"User-Agent": "XyranAI/1.0"})
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+
+        current = data["current_condition"][0]
+        area = data.get("nearest_area", [{}])[0]
+        area_name = area.get("areaName", [{}])[0].get("value", city or "Aapke area")
+        country = area.get("country", [{}])[0].get("value", "")
+
+        temp_c = current.get("temp_C", "?")
+        feels_like = current.get("FeelsLikeC", "?")
+        humidity = current.get("humidity", "?")
+        desc = current.get("weatherDesc", [{}])[0].get("value", "")
+        wind_kmph = current.get("windspeedKmph", "?")
+        visibility = current.get("visibility", "?")
+
+        # Hinglish weather description mapping
+        desc_hinglish = {
+            "Sunny": "Dhoop wala", "Clear": "Saaf aakash",
+            "Partly cloudy": "Thodi badal", "Cloudy": "Badal chhaya",
+            "Overcast": "Ghane badal", "Mist": "Dhundh",
+            "Fog": "Ghani dhundh", "Light rain": "Halki baarish",
+            "Moderate rain": "Baarish ho rahi hai", "Heavy rain": "Tez baarish",
+            "Thunderstorm": "Aandhi toofan", "Blizzard": "Barf ka toofan",
+            "Snow": "Barf", "Drizzle": "Boonda baandi",
+            "Patchy rain possible": "Thodi baarish ho sakti hai",
+        }
+        desc_hi = desc_hinglish.get(desc, desc)
+
+        location_str = f"{area_name}, {country}" if country else area_name
+        msg = (
+            f"📍 {location_str} ka mausam:\n"
+            f"🌡️  Temperature: {temp_c}°C (feels like {feels_like}°C)\n"
+            f"🌤️  Condition: {desc_hi}\n"
+            f"💧 Humidity: {humidity}%\n"
+            f"💨 Wind: {wind_kmph} km/h\n"
+            f"👁️  Visibility: {visibility} km"
+        )
+        return msg
+
+    except urllib.error.URLError:
+        return "Internet connection nahi hai ya wttr.in reachable nahi. Please check karo."
+    except Exception as e:
+        return f"Mausam fetch karte waqt kuch problem aayi: {e}"
 
 
 def prepare_editor_file(runtime_state, initial_text=None):
@@ -249,6 +309,19 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
             print("[Xyran] (Yeh ek-baar karna hoga, reboot ke baad udev rule se automatic hoga)")
         except FileNotFoundError:
             print("[Xyran] Backlight path nahi mila. intel_backlight support nahi hai is system pe.")
+        return True
+
+    if is_weather_request(lowered):
+        city = extract_weather_city(user_input)
+        if city:
+            print(f"[Xyran] {city} ka mausam dekh raha hoon...")
+        else:
+            print("[Xyran] Mausam dekh raha hoon...")
+        weather_info = fetch_weather(city)
+        print(f"[Xyran] {weather_info}")
+        if ai:
+            ai.conversation_history.append({"role": "user", "content": user_input})
+            ai.conversation_history.append({"role": "assistant", "content": weather_info})
         return True
 
     if is_news_summary_request(lowered, bool(news_manager.last_news_articles)):

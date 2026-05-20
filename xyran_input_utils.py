@@ -972,3 +972,47 @@ def percent_to_screen_raw(percent):
     return max(0, int(round(percent / 100.0 * max_val)))
 
 
+# ---------------------------------------------------------------------------
+# Weather helpers
+# ---------------------------------------------------------------------------
+
+def is_weather_request(user_input):
+    """Returns True if user is asking about weather/mausam."""
+    lowered = user_input.lower().strip()
+    weather_keywords = [
+        "mausam", "weather", "temperature", "garmi", "sardi", "barish",
+        "baarish", "aaj ka mausam", "kal ka mausam", "kaisa mausam",
+        "kitni garmi", "kitni sardi", "rain", "sunny", "cloudy", "storm",
+        "humidity", "aandhi", "toofan", "dhoop", "mausm", "mosam",
+    ]
+    return any(kw in lowered for kw in weather_keywords)
+
+
+def extract_weather_city(user_input):
+    """Extract city name from weather request. Returns None if not found."""
+    lowered = user_input.lower().strip()
+
+    # Remove filler words to isolate city
+    noise_words = [
+        "aaj", "kal", "parso", "ka", "ki", "ke", "mausam", "weather",
+        "temperature", "kaisa", "kesa", "hai", "batao", "btao", "bata",
+        "check", "dekho", "mein", "me", "pe", "par", "today", "tomorrow",
+        "tell", "me", "the", "what", "is", "how", "barish", "baarish",
+        "garmi", "sardi", "kitni", "how", "much",
+    ]
+
+    city_patterns = [
+        r"(?:mausam|weather)\s+(?:of|in|ka|ki|ke|mein|me)\s+([a-z\s]+?)(?:\s+(?:kaisa|kesa|hai|batao|btao|bata|check|dekho))?$",
+        r"([a-z\s]+?)\s+(?:mein|me|pe|par|ka|ki|ke)\s+(?:mausam|weather)",
+        r"(?:in|of)\s+([a-z\s]+?)(?:\s+(?:weather|mausam|temperature))?$",
+    ]
+    for pattern in city_patterns:
+        match = re.search(pattern, lowered)
+        if match:
+            city = match.group(1).strip()
+            city = " ".join(w for w in city.split() if w not in noise_words)
+            if city and len(city) > 1:
+                return city.title()
+    return None
+
+

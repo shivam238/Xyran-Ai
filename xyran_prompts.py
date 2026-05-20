@@ -44,6 +44,11 @@ BROWSER:
 - Google search: brave-browser "https://www.google.com/search?q=query" &
 - YouTube: brave-browser "https://youtube.com" &
 
+WEATHER:
+- You CAN check real-time weather! It is handled internally via wttr.in — no command needed.
+- If user asks "mausam kaisa hai", "aaj ka mausam", "weather batao", "Delhi mein mausam" etc. — just say you are checking.
+- You do NOT need to run any shell command for weather. It is already handled.
+
 SYSTEM:
 - Time: date +'%r'
 - Date: date +'%A, %d %B %Y'
