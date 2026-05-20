@@ -94,7 +94,7 @@ def _resolve_desktop_id(launch_command):
 def _extract_app_args(launch_command):
     """
     Extract file arguments from a launch command for passing to gtk-launch.
-    E.g. 'gnome-text-editor "/path/to/file.txt"' → '"/path/to/file.txt"'
+    Filters out command-line flags (starting with '-') since gtk-launch only accepts URIs.
     """
     clean = launch_command.strip()
 
@@ -106,8 +106,10 @@ def _extract_app_args(launch_command):
     try:
         parts = shlex.split(clean)
         if len(parts) > 1:
-            # Return all args after the executable, properly quoted
-            return " ".join(f'"{arg}"' if " " in arg else arg for arg in parts[1:])
+            # Filter out arguments starting with '-' (flags like --new-window)
+            file_args = [arg for arg in parts[1:] if not arg.startswith("-")]
+            # Return all args, properly quoted
+            return " ".join(f'"{arg}"' if " " in arg else arg for arg in file_args)
     except Exception:
         pass
     return ""
