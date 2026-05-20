@@ -107,6 +107,11 @@
       transition: color .2s;
     }
     .nav-links a:hover { color: var(--cyan); }
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+    }
     .nav-cta {
       padding: .45rem 1.1rem;
       background: transparent;
@@ -121,6 +126,32 @@
       transition: background .2s, color .2s;
     }
     .nav-cta:hover { background: var(--purple); color: #fff; }
+    .sound-toggle {
+      width: 34px;
+      height: 34px;
+      display: inline-grid;
+      place-items: center;
+      background: transparent;
+      border: 1px solid rgba(124,58,237,.5);
+      border-radius: 4px;
+      color: var(--purple-l);
+      cursor: pointer;
+      transition: background .2s, border-color .2s, color .2s;
+    }
+    .sound-toggle:hover {
+      background: rgba(124,58,237,.12);
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .sound-toggle svg {
+      width: 16px;
+      height: 16px;
+      stroke: currentColor;
+      stroke-width: 2;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
 
     /* ── Sections base ── */
     section { position: relative; z-index: 1; }
@@ -791,6 +822,237 @@
       .phase { grid-template-columns: 80px 32px 1fr; }
       .stats-row { gap: 2rem; flex-wrap: wrap; }
     }
+
+    /* ── Web Demo modal (single popup) ── */
+    #xyran-modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(4, 5, 10, 0.88);
+      backdrop-filter: blur(12px);
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      animation: overlayIn .25s ease both;
+    }
+    #xyran-modal-overlay.open { display: flex; }
+    @keyframes overlayIn {
+      from { opacity: 0; }
+      to   { opacity: 1; }
+    }
+
+    #xyran-modal {
+      width: min(780px, 100%);
+      max-height: 90vh;
+      background: #0d0f1a;
+      border: 1px solid rgba(124,58,237,.4);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 0 80px rgba(124,58,237,.2), 0 40px 80px rgba(0,0,0,.7);
+      animation: modalIn .3s cubic-bezier(.34,1.56,.64,1) both;
+    }
+    @keyframes modalIn {
+      from { opacity: 0; transform: translateY(30px) scale(.96); }
+      to   { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    #xyran-modal-header {
+      background: #111422;
+      border-bottom: 1px solid rgba(124,58,237,.2);
+      padding: .7rem 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-shrink: 0;
+    }
+    .m-dot { width: 11px; height: 11px; border-radius: 50%; }
+    .m-red    { background: #ff5f57; }
+    .m-yellow { background: #ffbd2e; }
+    .m-green  { background: #28c840; }
+    #xyran-modal-header .m-red { cursor: pointer; }
+    #xyran-modal-header .m-red:hover { filter: brightness(1.3); }
+    .m-title {
+      flex: 1;
+      text-align: center;
+      font-family: var(--mono);
+      font-size: .7rem;
+      color: #6b7280;
+      letter-spacing: .1em;
+    }
+    .m-close-x {
+      font-family: var(--mono);
+      font-size: .7rem;
+      color: #6b7280;
+      cursor: pointer;
+      padding: .2rem .5rem;
+      border: 1px solid rgba(124,58,237,.2);
+      border-radius: 4px;
+      transition: color .2s, border-color .2s;
+      background: transparent;
+    }
+    .m-close-x:hover { color: var(--cyan); border-color: var(--cyan); }
+
+    #xyran-sysbar {
+      background: #0a0c16;
+      border-bottom: 1px solid rgba(124,58,237,.15);
+      padding: .35rem 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-shrink: 0;
+    }
+    .sysbar-item {
+      font-family: var(--mono);
+      font-size: .62rem;
+      color: #3a3f5c;
+      letter-spacing: .05em;
+    }
+    .sysbar-item span { color: var(--cyan); }
+
+    #xyran-output {
+      flex: 1;
+      overflow-y: auto;
+      padding: 1.2rem 1.5rem;
+      font-family: var(--mono);
+      font-size: .78rem;
+      line-height: 1.85;
+      min-height: 300px;
+      max-height: 420px;
+    }
+    #xyran-output::-webkit-scrollbar { width: 3px; }
+    #xyran-output::-webkit-scrollbar-thumb { background: var(--purple); border-radius: 2px; }
+
+    .x-line { margin: 0; }
+    .x-prompt { color: #3a3f5c; }
+    .x-user   { color: #8892a4; }
+    .x-ai     { color: #a8ff78; }
+    .x-thinking { color: #3a3f5c; font-style: italic; }
+    .x-system  { color: var(--purple-l); }
+    .x-error   { color: #f87171; }
+    .x-separator { color: #1e2235; margin: .4rem 0; user-select: none; }
+    .x-label { color: var(--purple-l); font-weight: 700; }
+
+    .x-cursor {
+      display: inline-block;
+      width: 7px; height: 13px;
+      background: var(--cyan);
+      vertical-align: middle;
+      animation: xcursblink 1s step-end infinite;
+    }
+    @keyframes xcursblink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    #xyran-suggestions {
+      padding: .5rem 1.5rem .25rem;
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+      flex-shrink: 0;
+    }
+    .x-sugg {
+      font-family: var(--mono);
+      font-size: .62rem;
+      padding: .25rem .65rem;
+      border: 1px solid rgba(124,58,237,.25);
+      border-radius: 4px;
+      color: #6b7280;
+      cursor: pointer;
+      background: transparent;
+      letter-spacing: .04em;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .x-sugg:hover { border-color: var(--cyan); color: var(--cyan); background: rgba(0,212,170,.05); }
+
+    #xyran-input-row {
+      padding: .75rem 1.2rem 1rem;
+      border-top: 1px solid rgba(124,58,237,.15);
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      flex-shrink: 0;
+      background: #0a0c16;
+    }
+    .x-prompt-sym {
+      font-family: var(--mono);
+      font-size: .8rem;
+      color: var(--purple);
+      flex-shrink: 0;
+      user-select: none;
+    }
+    #xyran-input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      font-family: var(--mono);
+      font-size: .78rem;
+      color: var(--text);
+      caret-color: var(--cyan);
+    }
+    #xyran-input::placeholder { color: #3a3f5c; }
+    #xyran-send {
+      padding: .35rem .9rem;
+      background: linear-gradient(135deg, var(--purple), var(--purple-l));
+      border: none;
+      border-radius: 4px;
+      color: #fff;
+      font-family: var(--mono);
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .06em;
+      cursor: pointer;
+      transition: transform .15s, box-shadow .15s;
+      flex-shrink: 0;
+    }
+    #xyran-send:hover { transform: translateY(-1px); box-shadow: 0 0 20px rgba(124,58,237,.5); }
+    #xyran-send:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+    #xyran-mem-bar {
+      padding: .3rem 1.5rem;
+      border-top: 1px solid rgba(0,212,170,.08);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+      flex-shrink: 0;
+    }
+    .mem-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--cyan); animation: pulse 2s ease infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.3;transform:scale(.6)} }
+    .mem-label {
+      font-family: var(--mono);
+      font-size: .6rem;
+      color: #3a3f5c;
+      letter-spacing: .08em;
+    }
+    .mem-label span { color: var(--cyan); }
+
+    #xyran-demo-note {
+      margin: .5rem 1.5rem 0;
+      padding: .4rem .8rem;
+      background: rgba(124,58,237,.06);
+      border: 1px solid rgba(124,58,237,.2);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: .62rem;
+      color: #6b7280;
+      letter-spacing: .04em;
+      flex-shrink: 0;
+    }
+    #xyran-demo-note span { color: var(--purple-l); }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .x-spin {
+      display: inline-block;
+      width: 10px; height: 10px;
+      border: 1.5px solid #3a3f5c;
+      border-top-color: var(--cyan);
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: 6px;
+    }
   </style>
 </head>
 <body>
@@ -798,6 +1060,8 @@
 <!-- cursor -->
 <div id="cursor"></div>
 <div id="cursor-ring"></div>
+
+<audio id="xyran-core-audio" src="Xyran%20Core.mp3" loop autoplay preload="auto"></audio>
 
 <!-- canvas background -->
 <canvas id="grid-canvas"></canvas>
@@ -811,8 +1075,12 @@
     <li><a href="#changelog">Changelog</a></li>
     <li><a href="#docs">Docs</a></li>
     <li><a href="#community">Community</a></li>
+    <li><a href="#" data-open-xyran-demo>Demo</a></li>
   </ul>
-  <a class="nav-cta" href="#install">→ Get Started</a>
+  <div class="nav-actions">
+    <a class="nav-cta" href="#install">→ Get Started</a>
+    <button class="sound-toggle" id="sound-toggle" type="button" aria-label="Toggle background music" aria-pressed="true"></button>
+  </div>
 </nav>
 
 <!-- HERO -->
@@ -835,7 +1103,7 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
       GitHub
     </a>
-    <a href="#" class="btn-ghost" id="try-web-btn">⚡ Try Web Demo</a>
+    <a href="#" class="btn-ghost" id="try-web-btn" data-open-xyran-demo>⚡ Try Web Demo</a>
   </div>
 
   <!-- Terminal demo -->
@@ -1240,6 +1508,53 @@ cp .env.example .env
   </div>
 </footer>
 
+<!-- Web Demo modal -->
+<div id="xyran-modal-overlay" aria-hidden="true">
+  <div id="xyran-modal" role="dialog" aria-modal="true" aria-label="Xyran Web Demo">
+    <div id="xyran-modal-header">
+      <div class="m-dot m-red" title="Close"></div>
+      <div class="m-dot m-yellow"></div>
+      <div class="m-dot m-green"></div>
+      <div class="m-title">XYRAN AI — WEB DEMO v1.0</div>
+      <button class="m-close-x" type="button">✕ close</button>
+    </div>
+
+    <div id="xyran-sysbar">
+      <div class="sysbar-item">model: <span id="x-model">openai</span></div>
+      <div class="sysbar-item">memory: <span>session</span></div>
+      <div class="sysbar-item">vision: <span>disabled</span></div>
+      <div class="sysbar-item" id="x-msg-count">msgs: <span>0</span></div>
+    </div>
+
+    <div id="xyran-demo-note">
+      ⚡ <span>Web Demo</span> — Local install ke liye terminal automation, vision & persistent memory milti hai.
+      <a href="#install" style="color:var(--cyan); text-decoration:none; margin-left:.5rem">↓ Install Full Version</a>
+    </div>
+
+    <div id="xyran-output"></div>
+
+    <div id="xyran-suggestions">
+      <button class="x-sugg" type="button" data-fill="DSA me binary search samjhao">DSA binary search</button>
+      <button class="x-sugg" type="button" data-fill="Python me decorator kya hota hai?">Python decorator</button>
+      <button class="x-sugg" type="button" data-fill="Linux terminal ke 5 useful commands batao">Linux commands</button>
+      <button class="x-sugg" type="button" data-fill="Git rebase vs merge ka difference?">Git rebase vs merge</button>
+      <button class="x-sugg" type="button" data-fill="Mera naam Xyran rakh lo aur yaad rakho">Memory test</button>
+    </div>
+
+    <div id="xyran-input-row">
+      <span class="x-prompt-sym">$</span>
+      <input id="xyran-input" type="text" placeholder="kuch bhi poocho... (Hinglish ya English)" autocomplete="off" spellcheck="false"/>
+      <button id="xyran-send" type="button">ENTER ↵</button>
+    </div>
+
+    <div id="xyran-mem-bar">
+      <div class="mem-dot"></div>
+      <div class="mem-label">session memory: <span id="x-mem-count">0 facts</span></div>
+    </div>
+  </div>
+</div>
+
+<script src="firebase-client.js"></script>
 <script>
 /* ── Cursor ── */
 const cur = document.getElementById('cursor');
@@ -1253,6 +1568,72 @@ function animCursor() {
   requestAnimationFrame(animCursor);
 }
 animCursor();
+
+/* ── Background music ── */
+const coreAudio = document.getElementById('xyran-core-audio');
+const soundToggle = document.getElementById('sound-toggle');
+let coreAudioEnabled = localStorage.getItem('xyranCoreAudio') !== 'off';
+
+const soundOnIcon = `
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M11 5 6 9H3v6h3l5 4V5Z"></path>
+    <path d="M15.5 8.5a5 5 0 0 1 0 7"></path>
+    <path d="M18.5 5.5a9 9 0 0 1 0 13"></path>
+  </svg>`;
+const soundOffIcon = `
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <path d="M11 5 6 9H3v6h3l5 4V5Z"></path>
+    <path d="m19 9-6 6"></path>
+    <path d="m13 9 6 6"></path>
+  </svg>`;
+
+function updateSoundToggle() {
+  if (!soundToggle) return;
+  soundToggle.innerHTML = coreAudioEnabled ? soundOnIcon : soundOffIcon;
+  soundToggle.setAttribute('aria-pressed', String(coreAudioEnabled));
+  const isWaitingToStart = coreAudioEnabled && coreAudio?.paused;
+  soundToggle.setAttribute('title', isWaitingToStart ? 'Start music' : coreAudioEnabled ? 'Music on' : 'Music off');
+}
+
+function startCoreAudio() {
+  if (!coreAudio || !coreAudioEnabled) return;
+  coreAudio.volume = 0.35;
+  coreAudio.play().then(updateSoundToggle).catch(updateSoundToggle);
+}
+function tryAutoplayCoreAudio() {
+  if (!coreAudio || !coreAudioEnabled) return;
+  coreAudio.volume = 0.35;
+  coreAudio.play().then(updateSoundToggle).catch(updateSoundToggle);
+}
+function handleFirstAudioInteraction(e) {
+  if (e.target.closest('#sound-toggle')) return;
+  startCoreAudio();
+}
+function toggleCoreAudio() {
+  if (coreAudioEnabled && coreAudio?.paused) {
+    startCoreAudio();
+    return;
+  }
+
+  coreAudioEnabled = !coreAudioEnabled;
+  localStorage.setItem('xyranCoreAudio', coreAudioEnabled ? 'on' : 'off');
+  updateSoundToggle();
+  if (!coreAudio) return;
+  if (coreAudioEnabled) {
+    startCoreAudio();
+  } else {
+    coreAudio.pause();
+  }
+}
+updateSoundToggle();
+tryAutoplayCoreAudio();
+window.addEventListener('load', tryAutoplayCoreAudio);
+soundToggle?.addEventListener('click', toggleCoreAudio);
+window.addEventListener('pointerdown', handleFirstAudioInteraction, { once: true });
+window.addEventListener('keydown', startCoreAudio, { once: true });
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && coreAudio && coreAudio.paused) startCoreAudio();
+});
 
 /* ── Canvas grid ── */
 const canvas = document.getElementById('grid-canvas');
@@ -1456,6 +1837,223 @@ function renderChangelog(key) {
     </ul>`;
 }
 renderChangelog('v1_0');
+
+/* ── Web Demo modal (single popup) ── */
+let xHistory = [];
+let xMsgCount = 0;
+let xFacts = 0;
+let xIsThinking = false;
+
+const XYRAN_SYSTEM = `You are Xyran — a self-aware, locally-integrated personal AI agent created by Shivam Kumar Mahto (GitHub: shivam238) in May 2026.
+
+Speak like the full Xyran app:
+- Match the user's language naturally: Hinglish, Hindi, or English.
+- Be warm, sharp, practical, and a little playful; feel like a senior developer friend.
+- Answer confidently about Xyran's creator, origin, tech stack, abilities, and history.
+- Keep responses concise unless the user asks for detail.
+- Never output JSON action objects in the web demo.
+
+Full local Xyran abilities:
+- Dual memory system: FAISS vector memory plus SQLite structured facts.
+- Real-time screen vision through screenshots.
+- Hybrid LLM routing with Groq, Gemini, and local Ollama fallback.
+- Smart intent routing for fast offline tasks.
+- Multi-step command execution for apps, browser, screenshots, files, and system controls.
+- Real-time weather, news headlines, and image generation modules.
+- Fedora GNOME Wayland-first desktop automation.
+
+Web demo boundaries:
+- This browser demo is a conversational preview only.
+- It has session chat history, but not the full persistent local memory unless the backend adds it.
+- It cannot see the user's screen, run shell commands, open apps, change files, or automate the OS.
+- If the user asks for local automation, explain that the full installed Xyran can do it and guide them to install/run it.
+
+When asked "tu kya hai?", describe yourself as Xyran: an open-source, locally-integrated personal AI agent, with this web demo acting as the safe online preview.`;
+
+const xOverlay = () => document.getElementById('xyran-modal-overlay');
+const xOut = () => document.getElementById('xyran-output');
+const xInput = () => document.getElementById('xyran-input');
+const xSendBtn = () => document.getElementById('xyran-send');
+
+function getChatApiUrl() {
+  const isDevServer = location.hostname === 'localhost' && location.port === '4321';
+  return isDevServer ? '/api/chat' : 'http://localhost:4321/api/chat';
+}
+
+async function readChatJson(res) {
+  const contentType = res.headers.get('content-type') || '';
+  const bodyText = await res.text();
+
+  if (!contentType.includes('application/json')) {
+    throw new Error('Backend JSON nahi bhej raha. `npm run dev` chalao aur page http://localhost:4321 se open karo.');
+  }
+
+  const data = JSON.parse(bodyText);
+  if (!res.ok) {
+    throw new Error(data?.error?.message || `Request failed (${res.status})`);
+  }
+  return data;
+}
+
+function xLine(text, cls = 'x-ai') {
+  const d = document.createElement('div');
+  d.className = 'x-line ' + cls;
+  d.innerHTML = text;
+  xOut().appendChild(d);
+  xOut().scrollTop = xOut().scrollHeight;
+  return d;
+}
+
+function xScrollBottom() {
+  xOut().scrollTop = xOut().scrollHeight;
+}
+
+function openXyranDemo(e) {
+  if (e) e.preventDefault();
+  const overlay = xOverlay();
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  document.body.style.overflow = 'hidden';
+  if (xHistory.length === 0) xBoot();
+  setTimeout(() => xInput().focus(), 250);
+}
+
+function closeXyranDemo() {
+  const overlay = xOverlay();
+  overlay.classList.remove('open');
+  overlay.setAttribute('aria-hidden', 'true');
+  document.body.style.overflow = '';
+}
+
+function xBoot() {
+  const lines = [
+    { t: 0, text: '<span class="x-system">Initializing Xyran AI v1.0...</span>' },
+    { t: 400, text: '<span class="x-thinking">  ✓ LLM backend: server proxy (/api/chat)</span>' },
+    { t: 700, text: '<span class="x-thinking">  ✓ Session memory: ready</span>' },
+    { t: 1000, text: '<span class="x-thinking">  ✓ Intent router: active</span>' },
+    { t: 1300, text: '<span class="x-separator">──────────────────────────────────────────</span>' },
+    { t: 1600, text: '<span class="x-ai">[Xyran] Kya haal hai! Web demo mein welcome hai.</span>' },
+    { t: 1900, text: '<span class="x-ai">Kuch bhi poocho — code, Linux, DSA, ya bas baat karo.</span>' },
+    { t: 2200, text: '<span class="x-separator">──────────────────────────────────────────</span>' },
+  ];
+  lines.forEach(l => setTimeout(() => { xLine(l.text, ''); xScrollBottom(); }, l.t));
+}
+
+function xFill(text) {
+  xInput().value = text;
+  xInput().focus();
+}
+
+async function xSend() {
+  const raw = xInput().value.trim();
+  if (!raw || xIsThinking) return;
+
+  xInput().value = '';
+  xIsThinking = true;
+  xSendBtn().disabled = true;
+
+  xMsgCount++;
+  document.querySelector('#x-msg-count span').textContent = xMsgCount;
+
+  xLine(`<span class="x-prompt">[you]</span> <span class="x-user">${escHtml(raw)}</span>`, '');
+
+  if (/\b(remember|yaad|naam|mera|mujhe)\b/i.test(raw)) {
+    xFacts++;
+    document.getElementById('x-mem-count').textContent = xFacts + ' fact' + (xFacts !== 1 ? 's' : '');
+  }
+
+  const thinkLine = xLine('<span class="x-spin"></span><span class="x-thinking">[Xyran] Soch raha hoon...</span>', '');
+  xHistory.push({ role: 'user', content: raw });
+
+  try {
+    const res = await fetch(getChatApiUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        system: XYRAN_SYSTEM,
+        messages: xHistory
+      })
+    });
+
+    const data = await readChatJson(res);
+    thinkLine.remove();
+
+    if (data.provider) {
+      const label = String(data.provider || '').trim();
+      if (label) document.getElementById('x-model').textContent = label;
+    }
+
+    if (data.reply) {
+      const reply = String(data.reply || '');
+      xHistory.push({ role: 'assistant', content: reply });
+      window.XyranFirebase?.saveChat({
+        user: raw,
+        assistant: reply,
+        provider: data.provider
+      });
+
+      const replyLines = reply.split('\n');
+      replyLines.forEach((line, i) => {
+        const safe = escHtml(line);
+        if (i === 0) {
+          xLine(`<span class="x-label">[Xyran]</span> <span class="x-ai">${safe}</span>`, '');
+        } else if (line.trim()) {
+          xLine(`<span class="x-ai" style="padding-left:2.2rem;">${safe}</span>`, '');
+        } else {
+          xLine('', '');
+        }
+      });
+    } else if (data.error) {
+      xLine(`<span class="x-error">[Xyran] Error: ${escHtml(data.error.message || 'kuch galat hua')}</span>`, '');
+    } else {
+      xLine(`<span class="x-error">[Xyran] Error: invalid response</span>`, '');
+    }
+  } catch (err) {
+    thinkLine.remove();
+    xLine(`<span class="x-error">[Xyran] ${escHtml(err.message || 'unknown')}</span>`, '');
+  }
+
+  xLine('<span class="x-separator">──────────────────────────────────────────</span>', '');
+  xIsThinking = false;
+  xSendBtn().disabled = false;
+  xInput().focus();
+  xScrollBottom();
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+document.querySelectorAll('[data-open-xyran-demo]').forEach(el => el.addEventListener('click', openXyranDemo));
+document.querySelector('#xyran-modal-header .m-red')?.addEventListener('click', closeXyranDemo);
+document.querySelector('#xyran-modal-header .m-close-x')?.addEventListener('click', closeXyranDemo);
+
+document.getElementById('xyran-demo-note')?.querySelector('a')?.addEventListener('click', () => {
+  closeXyranDemo();
+});
+
+document.getElementById('xyran-suggestions')?.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-fill]');
+  if (!btn) return;
+  xFill(btn.getAttribute('data-fill') || '');
+});
+
+xSendBtn()?.addEventListener('click', xSend);
+xInput()?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); xSend(); }
+});
+
+xOverlay()?.addEventListener('click', (e) => {
+  if (e.target === xOverlay()) closeXyranDemo();
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && xOverlay()?.classList.contains('open')) closeXyranDemo();
+});
 </script>
 </body>
 </html>
