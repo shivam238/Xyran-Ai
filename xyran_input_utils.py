@@ -109,15 +109,15 @@ def is_self_identity_request(user_input):
         "konsa version hai", "kaun sa version", "version kya hai",
         "pehle kesa tha", "pehle kaisa tha", "pehle kya tha",
         "kab bana", "kab banaya", "when were you created", "kaise evolve kiya",
-        # Updates / Changes / Git
-        "update", "updates", "recent changes", "latest changes", "kya change", 
-        "kya badla", "git log", "git commit", "commit", "status kya hai", 
-        "codebase status", "kya update hai", "kya update hua",
-        # General self-reflection
-        "xyran kya hai", "xyran kon hai", "xyran kaun hai",
-        "tere baare mein batao", "tere baare me btao",
+        # Self Codebase / Git Updates (strictly self-referential)
+        "mere updates", "tere updates", "codebase status", "apne updates",
+        "mere commits", "tere commits", "apne changes", "git log", "git status",
     ]
-    return any(phrase in lowered for phrase in identity_phrases)
+    # Exact single word check to avoid generic triggers on things like "updates of spotify"
+    exact_match = lowered in {
+        "updates", "update", "commits", "changelog", "version", "history", "git"
+    }
+    return exact_match or any(phrase in lowered for phrase in identity_phrases)
 
 
 def get_dynamic_git_and_code_info():
