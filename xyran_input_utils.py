@@ -72,10 +72,10 @@ def is_acknowledgement(user_input):
 
 def is_greeting(user_input):
     lowered = user_input.lower().strip()
-    if lowered in {"yo", "namaste", "salam"}:
+    if lowered in {"hi", "hello", "hey", "yo", "namaste", "salam", "hii", "hiii", "heyy", "heyyy"}:
         return True
     compact = re.sub(r"(.)\1+", r"\1", lowered)
-    return compact in {"hi", "hello", "hey"}
+    return compact in {"hi", "hey"}
 
 
 def is_self_identity_request(user_input):

@@ -16,6 +16,10 @@ from config import (
     GROQ_API_KEY,
     MODEL,
     NEWS_API_KEY,
+    OLLAMA_BASE_URL,
+    OLLAMA_ENABLED,
+    OLLAMA_MODEL,
+    OLLAMA_VISION_MODEL,
     USER_NAME,
 )
 from vision import take_screenshot
@@ -69,6 +73,10 @@ ai = XyranAI(
     fallback_api_key=FALLBACK_API_KEY,
     fallback_model=FALLBACK_MODEL,
     fallback_base_url=FALLBACK_BASE_URL,
+    ollama_enabled=OLLAMA_ENABLED,
+    ollama_base_url=OLLAMA_BASE_URL,
+    ollama_model=OLLAMA_MODEL,
+    ollama_vision_model=OLLAMA_VISION_MODEL,
     runtime_state=runtime_state,
 )
 news_manager = NewsManager(
@@ -114,11 +122,17 @@ def main():
     migrate_old_neural_memories()
     build_index()
     news_manager.load_state()
+    ollama_status = "off"
+    if ai.has_ollama_provider():
+        ollama_status = f"ready ({ai.ollama_model})"
+    elif ai.has_ollama_configured():
+        ollama_status = "configured but not reachable — run: ollama serve"
     print(f"""
 ╔══════════════════════════════════════════╗
 ║         XYRAN AI v1 - ONLINE             ║
 ╚══════════════════════════════════════════╝
 'exit' likho band karne ke liye.
+Ollama fallback: {ollama_status}
 """)
 
     while True:
@@ -145,16 +159,20 @@ def main():
                 continue
 
             # --- Intent Router (Gatekeeper) ---
-            route = route_intent(user_input, prev_action_category=runtime_state.last_action_category if runtime_state else None)
+            route = route_intent(
+                user_input,
+                prev_action_category=runtime_state.last_action_category if runtime_state else None,
+            )
 
-            if route == "DIRECT_HANDLER":
-                if handle_direct_action(user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai):
+            # Multi-step compound tasks need LLM run_multi planner — skip partial direct execution
+            if route != "LLM_PLANNER":
+                if handle_direct_action(
+                    user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai
+                ):
                     runtime_state.last_input_used_vision = False
                     continue
-                # Direct handler didn't match — fall through to LLM
 
-            # route == "LLM_PLANNER" or "LLM_FALLBACK" or direct handler miss
-            # All go to LLM below
+            # route == "LLM_PLANNER" or "LLM_FALLBACK" (after direct miss) — cloud and/or Ollama
 
             use_vision = should_use_vision(user_input)
 

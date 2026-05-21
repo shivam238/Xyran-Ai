@@ -5,6 +5,9 @@
         },
         "dog_name": {
             "value": "Ashita"
+        },
+        "ollama_status": {
+            "value": "yes"
         }
     },
     "preferences": [

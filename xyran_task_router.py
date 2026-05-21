@@ -146,6 +146,22 @@ def route_intent(text, prev_action_category=None):
     if is_news_request(text) or is_more_news_request(text, has_last_query=True) or is_news_summary_request(text, has_last_news_articles=True):
         return "DIRECT_HANDLER"
 
+    # Social / chitchat — local replies, no API
+    from xyran_input_utils import (
+        get_local_smalltalk_reply,
+        is_acknowledgement,
+        is_greeting,
+        is_joke_request,
+    )
+    lowered = text.lower().strip()
+    if (
+        is_greeting(lowered)
+        or is_acknowledgement(lowered)
+        or is_joke_request(lowered)
+        or get_local_smalltalk_reply(lowered)
+    ):
+        return "DIRECT_HANDLER"
+
     if is_compound_task(text):
         return "LLM_PLANNER"
 

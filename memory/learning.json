@@ -40,5 +40,12 @@
         "result": "failed",
         "confidence": 0.25,
         "time": "2026-05-20T15:59:40.627888"
+    },
+    {
+        "input": "kya hai",
+        "intent": "get_user_name",
+        "result": "failed",
+        "confidence": 0.25,
+        "time": "2026-05-21T16:21:22.246554"
     }
 ]

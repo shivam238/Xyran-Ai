@@ -141,9 +141,19 @@ def _dbus_activate_app(desktop_id):
     except Exception:
         return False
 
+def _is_self_relaunch_command(command: str) -> bool:
+    lowered = command.lower()
+    return "xyran.py" in lowered and ("xyran-ai" in lowered or "xyran_ai" in lowered)
+
+
 def run_command(command):
     try:
         stripped_command = command.strip()
+        if _is_self_relaunch_command(stripped_command):
+            return (
+                "Xyran already chal raha hai — isi terminal mein command do, "
+                "dubara python xyran.py mat chalao."
+            )
         executable_error = get_command_executable_error(stripped_command)
         if executable_error:
             return executable_error

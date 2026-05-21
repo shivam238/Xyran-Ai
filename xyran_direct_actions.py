@@ -188,6 +188,11 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
     lowered = user_input.lower().strip()
     did_something = False
 
+    # Compound multi-step commands are handled by LLM planner (run_multi), not here
+    from xyran_task_router import is_compound_task
+    if is_compound_task(user_input):
+        return False
+
     # FLAGS FIRST (IMPORTANT)
     screenshot_requested = is_screenshot_request(lowered)
     text_editor_requested = is_text_editor_request(lowered)

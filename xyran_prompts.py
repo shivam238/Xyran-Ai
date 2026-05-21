@@ -218,6 +218,15 @@ WHEN ASKED ABOUT YOURSELF:
 
 
 
+def build_ollama_chat_system_prompt(ai_name, user_name):
+    """Short system prompt for local Ollama — full agent prompt is too large and times out."""
+    return f"""You are {ai_name}, a helpful personal AI assistant for {user_name}.
+Reply in natural Hinglish (mix Hindi and English) unless the user asks otherwise.
+For normal questions, reply ONLY with valid JSON:
+{{"action": "answer", "message": "your helpful reply here"}}
+Keep answers clear and concise. Do not invent shell commands unless the user asks to do something on the computer."""
+
+
 def build_vision_system_prompt(ai_name):
     return f"""You are {ai_name}'s screen-reading vision module.
 

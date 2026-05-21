@@ -7,6 +7,11 @@ import urllib.request
 from groq import RateLimitError
 
 from xyran_input_utils import humanize_wait_time
+from xyran_network import has_internet
+
+OLLAMA_TIMEOUT = 300
+OLLAMA_PING_TIMEOUT = 2.0
+OLLAMA_MAX_HISTORY_TURNS = 6
 
 
 def clean_json(reply):
@@ -36,6 +41,10 @@ class XyranAI:
         fallback_api_key,
         fallback_model,
         fallback_base_url,
+        ollama_enabled=True,
+        ollama_base_url="http://127.0.0.1:11434",
+        ollama_model="llama3.2",
+        ollama_vision_model="llava",
         runtime_state,
     ):
         self.client = client
@@ -49,8 +58,13 @@ class XyranAI:
         self.fallback_api_key = fallback_api_key
         self.fallback_model = fallback_model
         self.fallback_base_url = fallback_base_url
+        self.ollama_enabled = ollama_enabled
+        self.ollama_base_url = (ollama_base_url or "http://127.0.0.1:11434").rstrip("/")
+        self.ollama_model = ollama_model or "llama3.2"
+        self.ollama_vision_model = ollama_vision_model or "llava"
         self.runtime_state = runtime_state
         self.conversation_history = []
+        self._ollama_available = None
 
     def has_groq_provider(self):
         return bool(self.client and self.groq_api_key)
@@ -60,6 +74,129 @@ class XyranAI:
 
     def has_fallback_provider(self):
         return bool(self.fallback_api_key and self.fallback_model and self.fallback_base_url)
+
+    def has_ollama_configured(self):
+        return bool(self.ollama_enabled and self.ollama_model and self.ollama_base_url)
+
+    def is_ollama_running(self):
+        if not self.has_ollama_configured():
+            return False
+        try:
+            request = urllib.request.Request(
+                f"{self.ollama_base_url}/api/tags",
+                method="GET",
+            )
+            with urllib.request.urlopen(request, timeout=OLLAMA_PING_TIMEOUT) as response:
+                return response.status == 200
+        except Exception:
+            return False
+
+    def has_ollama_provider(self):
+        if self._ollama_available is None:
+            self._ollama_available = self.is_ollama_running()
+        return self._ollama_available
+
+    def _reset_ollama_availability(self):
+        self._ollama_available = None
+
+    def _messages_for_ollama(self, messages):
+        from config import AI_NAME, USER_NAME
+        from xyran_prompts import build_ollama_chat_system_prompt
+
+        ollama_messages = [
+            {
+                "role": "system",
+                "content": build_ollama_chat_system_prompt(AI_NAME, USER_NAME),
+            }
+        ]
+        dialog = []
+        for message in messages:
+            role = message.get("role")
+            if role == "system":
+                continue
+            content = message.get("content")
+            if isinstance(content, list):
+                text_parts = []
+                for part in content:
+                    if isinstance(part, dict) and part.get("type") == "text":
+                        text_parts.append(part.get("text", ""))
+                content = "\n".join(p for p in text_parts if p).strip()
+            if not isinstance(content, str) or not content.strip():
+                continue
+            if role not in {"user", "assistant"}:
+                continue
+            dialog.append({"role": role, "content": content.strip()})
+
+        if dialog:
+            ollama_messages.extend(dialog[-OLLAMA_MAX_HISTORY_TURNS:])
+        return ollama_messages
+
+    def _call_ollama_chat(self, messages, model=None, temperature=0.2, max_tokens=600):
+        if not self.has_ollama_configured():
+            raise RuntimeError("Ollama configured nahi hai.")
+        ollama_messages = self._messages_for_ollama(messages)
+        if len(ollama_messages) < 2:
+            raise RuntimeError("Ollama request ke liye valid messages nahi mile.")
+
+        payload = {
+            "model": model or self.ollama_model,
+            "messages": ollama_messages,
+            "stream": False,
+            "options": {
+                "temperature": temperature,
+                "num_predict": max_tokens,
+            },
+        }
+        request = urllib.request.Request(
+            f"{self.ollama_base_url}/api/chat",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=OLLAMA_TIMEOUT) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        reply = (body.get("message") or {}).get("content", "").strip()
+        if not reply:
+            raise RuntimeError("Ollama ne khali response diya.")
+        return reply
+
+    def _call_ollama_vision(self, user_input, image_path, model=None):
+        if not self.has_ollama_configured():
+            raise RuntimeError("Ollama configured nahi hai.")
+        with open(image_path, "rb") as file_obj:
+            image_b64 = base64.standard_b64encode(file_obj.read()).decode("utf-8")
+
+        vision_model = model or self.ollama_vision_model
+        prompt = (
+            f"{self.vision_system_prompt}\n\n"
+            f"Screenshot dekho aur user ke command ka jawab do.\n"
+            f"User command: {user_input}\n"
+            f"Short structured Hinglish mein jawab do. JSON format prefer karo."
+        )
+        payload = {
+            "model": vision_model,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": prompt,
+                    "images": [image_b64],
+                }
+            ],
+            "stream": False,
+            "options": {"temperature": 0, "num_predict": 600},
+        }
+        request = urllib.request.Request(
+            f"{self.ollama_base_url}/api/chat",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=OLLAMA_TIMEOUT) as response:
+            body = json.loads(response.read().decode("utf-8"))
+        reply = (body.get("message") or {}).get("content", "").strip()
+        if not reply:
+            raise RuntimeError("Ollama vision ne khali response diya.")
+        return reply
 
     def _call_openai_compatible_fallback(self, messages, model, temperature=0.2, max_tokens=600):
         payload = {
@@ -163,29 +300,52 @@ class XyranAI:
             return True
         return len(lowered) > 220 or any(keyword in lowered for keyword in complexity_keywords)
 
+    def _provider_available(self, provider):
+        if provider == "groq":
+            return self.has_groq_provider()
+        if provider == "gemini":
+            return self.has_gemini_provider()
+        if provider == "fallback":
+            return self.has_fallback_provider()
+        if provider == "ollama":
+            return self.has_ollama_provider()
+        return False
+
     def _get_text_provider_order(self, user_input="", screen_context=None, preferred_order=None):
         if preferred_order:
-            return [provider for provider in preferred_order if provider]
+            return [
+                provider for provider in preferred_order
+                if self._provider_available(provider)
+            ]
 
+        online = has_internet()
         mode = self.provider_mode or "smart"
-        if mode == "gemini":
-            base_order = ["gemini", "groq", "fallback"]
+
+        if mode == "ollama":
+            base_order = ["ollama", "groq", "gemini", "fallback"]
+        elif mode == "gemini":
+            base_order = ["gemini", "groq", "fallback", "ollama"]
         elif mode == "groq":
-            base_order = ["groq", "gemini", "fallback"]
+            base_order = ["groq", "gemini", "fallback", "ollama"]
         else:
             if self._looks_complex_text_request(user_input, screen_context):
-                base_order = ["gemini", "groq", "fallback"]
+                base_order = ["gemini", "groq", "fallback", "ollama"]
             else:
-                base_order = ["groq", "gemini", "fallback"]
+                base_order = ["groq", "gemini", "fallback", "ollama"]
+
+        if not online:
+            if self.has_ollama_provider():
+                return ["ollama"]
+            base_order = [p for p in base_order if p != "ollama"]
 
         available = []
         for provider in base_order:
-            if provider == "groq" and self.has_groq_provider():
+            if self._provider_available(provider) and provider not in available:
                 available.append(provider)
-            elif provider == "gemini" and self.has_gemini_provider():
-                available.append(provider)
-            elif provider == "fallback" and self.has_fallback_provider():
-                available.append(provider)
+
+        if online and self.has_ollama_provider() and "ollama" not in available:
+            available.append("ollama")
+
         return available
 
     def generate_text_reply(
@@ -205,16 +365,38 @@ class XyranAI:
             preferred_order=preferred_order,
         )
         if not provider_order:
-            raise RuntimeError("Koi text AI provider configured nahi hai.")
+            hint = (
+                "Koi text AI provider available nahi hai. "
+                "Groq/Gemini keys configure karo ya local Ollama chalao: ollama serve && ollama pull "
+                f"{self.ollama_model}"
+            )
+            raise RuntimeError(hint)
 
         errors = []
         target_model = fallback_model or self.model
+        used_cloud = False
         for provider in provider_order:
+            if provider != "ollama":
+                used_cloud = True
             try:
                 if provider == "groq":
                     reply = self._call_groq_chat(messages, self.model, temperature=temperature, max_tokens=max_tokens)
                 elif provider == "gemini":
                     reply = self._call_gemini_chat(messages, self.gemini_model, temperature=temperature, max_tokens=max_tokens)
+                elif provider == "ollama":
+                    if used_cloud:
+                        print("[Xyran] Cloud APIs fail — local Ollama use kar raha hoon...")
+                    else:
+                        print(
+                            "[Xyran] Local Ollama se jawab bana raha hoon "
+                            "(CPU par 1-3 min lag sakta hai, please wait)..."
+                        )
+                    reply = self._call_ollama_chat(
+                        messages,
+                        model=self.ollama_model,
+                        temperature=temperature,
+                        max_tokens=max_tokens,
+                    )
                 else:
                     reply = self._call_openai_compatible_fallback(messages, target_model, temperature=temperature, max_tokens=max_tokens)
                 self.runtime_state.last_provider_used = provider
@@ -225,15 +407,21 @@ class XyranAI:
                 errors.append((provider, error))
             except Exception as error:
                 errors.append((provider, error))
+                if provider == "ollama":
+                    self._reset_ollama_availability()
 
         raise RuntimeError("; ".join(f"{provider}: {error}" for provider, error in errors))
 
     def call_fallback_chat(self, messages, model, temperature=0.2, max_tokens=600):
         preferred = []
+        if not has_internet() and self.has_ollama_provider():
+            preferred.append("ollama")
         if self.has_gemini_provider():
             preferred.append("gemini")
         if self.has_fallback_provider():
             preferred.append("fallback")
+        if self.has_ollama_provider() and "ollama" not in preferred:
+            preferred.append("ollama")
         if not preferred:
             raise RuntimeError("Koi fallback text provider configured nahi hai.")
         return self.generate_text_reply(
@@ -288,9 +476,23 @@ class XyranAI:
             wait_match = re.search(r"Please try again in ([0-9hms.]+)", str(e))
             wait_text = humanize_wait_time(wait_match.group(1)) if wait_match else "thodi der"
             self.runtime_state.last_rate_limit_wait_text = wait_text
+            offline_hint = ""
+            if self.has_ollama_configured() and not self.has_ollama_provider():
+                offline_hint = (
+                    f" Local Ollama reachable nahi ({self.ollama_base_url}). "
+                    f"Chalao: ollama serve && ollama pull {self.ollama_model}"
+                )
+            elif "ollama: timed out" in str(e).lower():
+                offline_hint = (
+                    " Ollama bahut slow respond kar raha hai — dubara try karo ya chhota sawal pucho. "
+                    f"Model: {self.ollama_model}"
+                )
             return json.dumps({
                 "action": "answer",
-                "message": f"AI providers se reply nahi aa paya. Lagbhag {wait_text} baad phir try karo, ya direct local commands use karo. Agar Gemini/Groq/fallback configured honge to Xyran auto-switch karega."
+                "message": (
+                    f"AI providers se reply nahi aa paya. Lagbhag {wait_text} baad phir try karo, "
+                    f"ya direct local commands use karo (weather, apps, image, jokes).{offline_hint}"
+                ),
             })
 
         self.conversation_history.append({"role": "assistant", "content": reply})
@@ -352,7 +554,7 @@ class XyranAI:
         except Exception:
             pass
 
-        if self.has_fallback_provider():
+        if self.has_fallback_provider() and has_internet():
             try:
                 reply = self._call_openai_compatible_fallback(
                     messages,
@@ -365,8 +567,25 @@ class XyranAI:
             except Exception:
                 pass
 
+        if self.has_ollama_provider():
+            try:
+                reply = self._call_ollama_vision(user_input, image_path)
+                self.runtime_state.last_provider_used = "ollama"
+                return reply
+            except Exception:
+                self._reset_ollama_availability()
+
         self.runtime_state.last_rate_limit_wait_text = "thodi der"
+        ollama_hint = ""
+        if self.has_ollama_configured():
+            ollama_hint = (
+                f" Ya local vision model: ollama pull {self.ollama_vision_model} "
+                f"(OLLAMA_VISION_MODEL={self.ollama_vision_model})."
+            )
         return json.dumps({
             "action": "answer",
-            "message": "Vision API abhi available nahi hai. Thodi der baad phir try karo, ya Groq/OpenAI-compatible vision fallback configure karo."
+            "message": (
+                "Vision API abhi available nahi hai. Groq/Gemini vision try karo jab net ho, "
+                f"ya Ollama vision fallback.{ollama_hint}"
+            ),
         })

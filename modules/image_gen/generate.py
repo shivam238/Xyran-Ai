@@ -7,15 +7,15 @@ Hybrid image generation for Xyran.
 from __future__ import annotations
 
 import os
-import socket
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
+from xyran_network import has_internet
+
 POLLINATIONS_HOST = "image.pollinations.ai"
 POLLINATIONS_TIMEOUT = 60
-NETWORK_CHECK_TIMEOUT = 3.0
 SD_MODEL_ID = "runwayml/stable-diffusion-v1-5"
 SD_INFERENCE_STEPS = 20
 
@@ -35,13 +35,9 @@ def _build_output_path(prompt: str) -> str:
     return os.path.join(_output_dir(), f"{safe_name}_{timestamp}.png")
 
 
-def has_network(timeout: float = NETWORK_CHECK_TIMEOUT) -> bool:
+def has_network(timeout: float = 3.0) -> bool:
     """Quick connectivity check without downloading an image."""
-    try:
-        with socket.create_connection((POLLINATIONS_HOST, 443), timeout=timeout):
-            return True
-    except OSError:
-        return False
+    return has_internet(timeout)
 
 
 def generate_image_online(prompt: str, output_path: str) -> None:

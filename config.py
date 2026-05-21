@@ -36,3 +36,9 @@ AI_PROVIDER_MODE = os.getenv("AI_PROVIDER_MODE", "smart").strip().lower()
 AI_NAME = os.getenv("AI_NAME", "Xyran")
 USER_NAME = os.getenv("USER_NAME", "darkeeidea")
 NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
+
+# Local Ollama (offline / API-fail fallback for text + optional vision)
+OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://127.0.0.1:11434").strip().rstrip("/")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2").strip()
+OLLAMA_VISION_MODEL = os.getenv("OLLAMA_VISION_MODEL", "llava").strip()
+OLLAMA_ENABLED = os.getenv("OLLAMA_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
