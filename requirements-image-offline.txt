@@ -1,0 +1,6 @@
+# Optional — only needed for offline image fallback (Stable Diffusion on CPU).
+# Online Pollinations path works without these packages.
+torch>=2.0.0
+diffusers>=0.25.0
+accelerate>=0.25.0
+transformers>=4.35.0

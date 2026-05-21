@@ -18,6 +18,7 @@ class RuntimeState:
     pending_age: str | None = None
     last_retrieved_memory_text: str | None = None
     last_action_category: str | None = None
-    last_screen_brightness_percent: int = 50  # track current screen brightness for relative steps
+    last_screen_brightness_percent: int = 50
+    last_image_path: str | None = None  # last AI-generated image path
 
 
