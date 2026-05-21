@@ -229,7 +229,8 @@ app.post('/api/chat', async (req, res) => {
   }
 });
 
-const port = Number(getEnv('PORT', '4321')) || 4321;
-app.listen(port, '127.0.0.1', () => {
-  console.log(`[xyran-web] running on http://localhost:${port}`);
+const port = Number(process.env.PORT || 4321);
+
+app.listen(port, '0.0.0.0', () => {
+  console.log(`[xyran-web] running on port ${port}`);
 });
