@@ -106,11 +106,27 @@ def is_compound_task(text):
     )
 
 
+def is_image_generation_request(text):
+    lowered = text.lower().strip()
+    trigger_verbs = ["generate", "create", "make", "draw", "banao", "bnao"]
+    trigger_nouns = ["image", "picture", "pic", "photo", "portrait"]
+    
+    if any(n in lowered for n in trigger_nouns):
+        return any(v in lowered for v in trigger_verbs)
+    if lowered.startswith(("draw ", "generate ", "banao ", "bnao ")):
+        return True
+    return False
+
+
 def route_intent(text, prev_action_category=None):
     """
     Gatekeeper: decides where to send the user input.
     Returns one of: "LLM_PLANNER", "DIRECT_HANDLER", "LLM_FALLBACK"
     """
+    # Image generation queries always go directly to DIRECT_HANDLER (handled via custom modules.image_gen)
+    if is_image_generation_request(text):
+        return "DIRECT_HANDLER"
+
     # Self-identity queries always go directly to DIRECT_HANDLER (fast offline responder)
     from xyran_input_utils import is_self_identity_request
     if is_self_identity_request(text):

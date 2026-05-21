@@ -882,6 +882,20 @@
       color: #6b7280;
       letter-spacing: .1em;
     }
+    .m-fullscreen-btn {
+      font-family: var(--mono);
+      font-size: .7rem;
+      color: #6b7280;
+      cursor: pointer;
+      padding: .2rem .5rem;
+      border: 1px solid rgba(124,58,237,.2);
+      border-radius: 4px;
+      transition: color .2s, border-color .2s;
+      background: transparent;
+      margin-right: .5rem;
+    }
+    .m-fullscreen-btn:hover { color: var(--cyan); border-color: var(--cyan); }
+
     .m-close-x {
       font-family: var(--mono);
       font-size: .7rem;
@@ -894,6 +908,25 @@
       background: transparent;
     }
     .m-close-x:hover { color: var(--cyan); border-color: var(--cyan); }
+
+    #xyran-modal.fullscreen {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      max-height: 100vh !important;
+      max-height: 100dvh !important;
+      border-radius: 0 !important;
+      border: none !important;
+    }
+    #xyran-modal-overlay.has-fullscreen {
+      padding: 0 !important;
+      align-items: stretch !important;
+      justify-content: stretch !important;
+    }
+    #xyran-modal.fullscreen #xyran-output {
+      max-height: none !important;
+    }
 
     #xyran-sysbar {
       background: #0a0c16;
@@ -1224,6 +1257,9 @@
         padding: 1rem;
         font-size: .68rem;
         line-height: 1.7;
+        white-space: pre-wrap;
+        word-break: break-all;
+        overflow-x: auto;
       }
       .phase {
         grid-template-columns: 64px 24px minmax(0, 1fr);
@@ -1268,6 +1304,7 @@
         font-size: .55rem;
         letter-spacing: .06em;
       }
+      .m-fullscreen-btn,
       .m-close-x {
         padding: .18rem .4rem;
         font-size: .58rem;
@@ -1836,6 +1873,7 @@ cp .env.example .env
       <div class="m-dot m-yellow"></div>
       <div class="m-dot m-green"></div>
       <div class="m-title">XYRAN AI — WEB DEMO v1.0</div>
+      <button class="m-fullscreen-btn" type="button">⛶ fullscreen</button>
       <button class="m-close-x" type="button">✕ close</button>
     </div>
 
@@ -1917,12 +1955,12 @@ function updateSoundToggle() {
 
 function startCoreAudio() {
   if (!coreAudio || !coreAudioEnabled) return;
-  coreAudio.volume = 0.35;
+  coreAudio.volume = 0.75;
   coreAudio.play().then(updateSoundToggle).catch(updateSoundToggle);
 }
 function tryAutoplayCoreAudio() {
   if (!coreAudio || !coreAudioEnabled) return;
-  coreAudio.volume = 0.35;
+  coreAudio.volume = 0.75;
   coreAudio.play().then(updateSoundToggle).catch(updateSoundToggle);
 }
 function handleFirstAudioInteraction(e) {
@@ -2208,7 +2246,7 @@ function getChatApiUrl() {
   const isLocalHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   if (isDevServer) return '/api/chat';
   if (isLocalHost) return 'http://127.0.0.1:4321/api/chat';
-  return '/api/chat';
+  return 'http://localhost:4321/api/chat';
 }
 
 async function readChatJson(res) {
@@ -2254,6 +2292,15 @@ function closeXyranDemo() {
   overlay.classList.remove('open');
   overlay.setAttribute('aria-hidden', 'true');
   document.body.style.overflow = '';
+  
+  // Reset fullscreen
+  const modal = document.getElementById('xyran-modal');
+  if (modal?.classList.contains('fullscreen')) {
+    modal.classList.remove('fullscreen');
+    overlay.classList.remove('has-fullscreen');
+    const btn = document.querySelector('#xyran-modal-header .m-fullscreen-btn');
+    if (btn) btn.textContent = '⛶ fullscreen';
+  }
 }
 
 function xBoot() {
@@ -2294,17 +2341,17 @@ function getOfflineReply(raw, err) {
   const isFetchIssue = err instanceof TypeError || message.includes('failed to fetch') || message.includes('backend');
   if (!isFetchIssue) return '';
 
-  const base = 'Chat backend abhi connect nahi ho pa raha.';
+  const base = 'Chat backend (localhost:4321) abhi connect nahi ho pa raha hai.';
 
   if (/\b(hii|hi|hello|hey|namaste|kaise|kese)\b/i.test(raw)) {
-    return `${base}\nMain Xyran preview mode me online hoon. Full AI reply ke liye local backend run karo: cd web && npm run dev, phir http://localhost:4321 open karo.`;
+    return `${base}\nMain Xyran preview mode me online hoon.\n\nFull AI replies ke liye local backend run kijiye:\n1. Open terminal inside Xyran directory\n2. Run: cd web && npm run dev\n3. Keep the terminal running and refresh this page!`;
   }
 
   if (/\b(setup|install|kaise|kese|run|start)\b/i.test(raw)) {
-    return `${base}\nSetup quick path:\n1. cd web\n2. npm install\n3. cp .env.example .env\n4. OPENROUTER_API_KEY ya selected provider key bharo\n5. npm run dev\n6. http://localhost:4321 open karo`;
+    return `${base}\nSetup quick path:\n1. cd web\n2. npm install\n3. cp .env.example .env\n4. OPENROUTER_API_KEY ya selected provider key bharo\n5. npm run dev\n6. Keep terminal running and refresh this page!`;
   }
 
-  return `${base}\nAgar live site par ho to thoda refresh karo; agar local ho to: cd web && npm run dev.`;
+  return `${base}\nLocal backend run kijiye: cd web && npm run dev, phir is page ko refresh kijiye.`;
 }
 
 async function xSend() {
@@ -2392,6 +2439,18 @@ function escHtml(str) {
 document.querySelectorAll('[data-open-xyran-demo]').forEach(el => el.addEventListener('click', openXyranDemo));
 document.querySelector('#xyran-modal-header .m-red')?.addEventListener('click', closeXyranDemo);
 document.querySelector('#xyran-modal-header .m-close-x')?.addEventListener('click', closeXyranDemo);
+
+function toggleXyranFullscreen() {
+  const modal = document.getElementById('xyran-modal');
+  const overlay = document.getElementById('xyran-modal-overlay');
+  const btn = document.querySelector('#xyran-modal-header .m-fullscreen-btn');
+  if (!modal || !overlay || !btn) return;
+  
+  const isFullscreen = modal.classList.toggle('fullscreen');
+  overlay.classList.toggle('has-fullscreen', isFullscreen);
+  btn.textContent = isFullscreen ? '⛶ windowed' : '⛶ fullscreen';
+}
+document.querySelector('#xyran-modal-header .m-fullscreen-btn')?.addEventListener('click', toggleXyranFullscreen);
 
 document.getElementById('xyran-demo-note')?.querySelector('a')?.addEventListener('click', () => {
   closeXyranDemo();

@@ -71,6 +71,20 @@
       color: #6b7280;
       letter-spacing: .1em;
     }
+    .m-fullscreen-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: .7rem;
+      color: #6b7280;
+      cursor: pointer;
+      padding: .2rem .5rem;
+      border: 1px solid rgba(124,58,237,.2);
+      border-radius: 4px;
+      transition: color .2s, border-color .2s;
+      background: transparent;
+      margin-right: .5rem;
+    }
+    .m-fullscreen-btn:hover { color: #00d4aa; border-color: #00d4aa; }
+
     .m-close-x {
       font-family: 'JetBrains Mono', monospace;
       font-size: .7rem;
@@ -83,6 +97,25 @@
       background: transparent;
     }
     .m-close-x:hover { color: #00d4aa; border-color: #00d4aa; }
+
+    #xyran-modal.fullscreen {
+      width: 100vw !important;
+      max-width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      max-height: 100vh !important;
+      max-height: 100dvh !important;
+      border-radius: 0 !important;
+      border: none !important;
+    }
+    #xyran-modal-overlay.has-fullscreen {
+      padding: 0 !important;
+      align-items: stretch !important;
+      justify-content: stretch !important;
+    }
+    #xyran-modal.fullscreen #xyran-output {
+      max-height: none !important;
+    }
 
     /* ── System info bar ── */
     #xyran-sysbar {
@@ -276,6 +309,7 @@
       <div class="m-dot m-yellow"></div>
       <div class="m-dot m-green"></div>
       <div class="m-title">XYRAN AI — WEB DEMO v1.0</div>
+      <button class="m-fullscreen-btn" onclick="toggleXyranFullscreen()">⛶ fullscreen</button>
       <button class="m-close-x" onclick="closeXyranDemo()">✕ close</button>
     </div>
 
@@ -330,12 +364,12 @@
 const coreAudio = document.getElementById('xyran-core-audio');
 function startCoreAudio() {
   if (!coreAudio) return;
-  coreAudio.volume = 0.35;
+  coreAudio.volume = 0.75;
   coreAudio.play().catch(() => {});
 }
 function tryAutoplayCoreAudio() {
   if (!coreAudio) return;
-  coreAudio.volume = 0.35;
+  coreAudio.volume = 0.75;
   coreAudio.play().catch(() => {});
 }
 tryAutoplayCoreAudio();
@@ -431,8 +465,29 @@ function openXyranDemo() {
 }
 
 function closeXyranDemo() {
-  document.getElementById('xyran-modal-overlay').classList.remove('open');
+  const overlay = document.getElementById('xyran-modal-overlay');
+  overlay.classList.remove('open');
   document.body.style.overflow = '';
+  
+  // Reset fullscreen
+  const modal = document.getElementById('xyran-modal');
+  if (modal?.classList.contains('fullscreen')) {
+    modal.classList.remove('fullscreen');
+    overlay.classList.remove('has-fullscreen');
+    const btn = document.querySelector('#xyran-modal-header .m-fullscreen-btn');
+    if (btn) btn.textContent = '⛶ fullscreen';
+  }
+}
+
+function toggleXyranFullscreen() {
+  const modal = document.getElementById('xyran-modal');
+  const overlay = document.getElementById('xyran-modal-overlay');
+  const btn = document.querySelector('#xyran-modal-header .m-fullscreen-btn');
+  if (!modal || !overlay || !btn) return;
+  
+  const isFullscreen = modal.classList.toggle('fullscreen');
+  overlay.classList.toggle('has-fullscreen', isFullscreen);
+  btn.textContent = isFullscreen ? '⛶ windowed' : '⛶ fullscreen';
 }
 
 /* Close on overlay click */

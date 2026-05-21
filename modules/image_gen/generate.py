@@ -1,33 +1,42 @@
+"""
+Image generation via pollinations.ai
+- No API key needed
+- Free and fast (~3-5 seconds)
+- Returns a saved PNG path
+"""
+
 import os
-import torch
-from diffusers import StableDiffusionPipeline
-
-pipe = None
-
-def load_model():
-    global pipe
-    if pipe is None:
-        model_id = "runwayml/stable-diffusion-v1-5"
-
-        pipe = StableDiffusionPipeline.from_pretrained(
-            model_id,
-            torch_dtype=torch.float32
-        )
-
-        pipe = pipe.to("cpu")
-
-    return pipe
+import time
+import urllib.parse
+import urllib.request
 
 
-def generate_image(prompt: str):
-    model = load_model()
-
+def generate_image(prompt: str) -> str:
+    """
+    Fetches a generated image from pollinations.ai and saves it locally.
+    Returns the saved file path.
+    """
     output_dir = os.path.expanduser("~/Pictures/xyran")
     os.makedirs(output_dir, exist_ok=True)
 
-    output_path = os.path.join(output_dir, "xyran.png")
+    timestamp = int(time.time())
+    safe_name = "".join(c if c.isalnum() or c in "-_ " else "_" for c in prompt[:30]).strip()
+    safe_name = safe_name.replace(" ", "_") or "xyran_image"
+    output_path = os.path.join(output_dir, f"{safe_name}_{timestamp}.png")
 
-    image = model(prompt, num_inference_steps=20).images[0]
-    image.save(output_path)
+    encoded_prompt = urllib.parse.quote(prompt)
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&nologo=true&seed={timestamp}"
+
+    headers = {
+        "User-Agent": "XyranAI/1.0",
+        "Accept": "image/png,image/*",
+    }
+
+    req = urllib.request.Request(url, headers=headers)
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        image_data = resp.read()
+
+    with open(output_path, "wb") as f:
+        f.write(image_data)
 
     return output_path

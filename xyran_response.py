@@ -16,6 +16,34 @@ def process_response(reply, run_command, command_failed, summarize_output, clean
             if command.lower() in ("", "none", "null", "n/a", "no command"):
                 print("\n[Xyran] Main iske liye koi valid command identify nahi kar paya. Jo visible hai usi ke basis par answer dena better hoga.")
                 return
+
+            # --- Internal screenshot handler (single-step) ---
+            if command.lower() in ("screenshot", "take_screenshot"):
+                print("[Xyran] Screenshot le raha hoon...")
+                from vision import take_screenshot
+                from xyran_app_utils import save_screenshot_copy
+                from config import AI_NAME
+                import os
+                temp_path, err = take_screenshot()
+                if temp_path:
+                    saved_path = save_screenshot_copy(temp_path, AI_NAME)
+                    os.remove(temp_path)
+                    runtime_state.last_screenshot_path = saved_path
+                    print(f"[Xyran] Screenshot save ho gaya: {saved_path}")
+                else:
+                    print(f"[Xyran] Screenshot nahi le paya: {err}")
+                return
+
+            # --- Internal open-screenshot handler (single-step) ---
+            if command.lower() in ("open_screenshot", "show_screenshot"):
+                path_to_open = getattr(runtime_state, 'last_screenshot_path', None)
+                if path_to_open:
+                    run_command(f'xdg-open "{path_to_open}" &')
+                    print(f"[Xyran] Screenshot khol diya: {path_to_open}")
+                else:
+                    print("[Xyran] Abhi tak koi screenshot save nahi hua hai.")
+                return
+
             print(f"[CMD] {command}")
             output = run_command(command)
             if output and output != "Done.":

@@ -205,10 +205,14 @@ def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module
     youtube_handled = False
     search_handled = False
 
-    # IMAGE GENERATION (NEW MODULE)
+    # IMAGE GENERATION
     image_result = handle_image(user_input, AI_NAME)
     if image_result:
-        print(image_result)
+        result_msg, img_path = image_result if isinstance(image_result, tuple) else (image_result, None)
+        print(result_msg)
+        if img_path:
+            import subprocess
+            subprocess.Popen(["xdg-open", img_path])
         did_something = True
         if not continue_after_action:
             return True
