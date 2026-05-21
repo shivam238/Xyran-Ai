@@ -2208,7 +2208,7 @@ function getChatApiUrl() {
   const isLocalHost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
   if (isDevServer) return '/api/chat';
   if (isLocalHost) return 'http://127.0.0.1:4321/api/chat';
-  return null;
+  return '/api/chat';
 }
 
 async function readChatJson(res) {
@@ -2290,14 +2290,11 @@ function renderXyranReply(reply) {
 }
 
 function getOfflineReply(raw, err) {
-  const hostedSite = !['localhost', '127.0.0.1'].includes(location.hostname);
   const message = String(err?.message || '').toLowerCase();
   const isFetchIssue = err instanceof TypeError || message.includes('failed to fetch') || message.includes('backend');
-  if (!hostedSite && !isFetchIssue) return '';
+  if (!isFetchIssue) return '';
 
-  const base = hostedSite
-    ? 'Live Firebase site abhi static Hosting par chal rahi hai, isliye browser se server-side API key wala chat backend direct available nahi hai.'
-    : 'Local chat backend abhi connect nahi ho pa raha.';
+  const base = 'Chat backend abhi connect nahi ho pa raha.';
 
   if (/\b(hii|hi|hello|hey|namaste|kaise|kese)\b/i.test(raw)) {
     return `${base}\nMain Xyran preview mode me online hoon. Full AI reply ke liye local backend run karo: cd web && npm run dev, phir http://localhost:4321 open karo.`;
@@ -2307,7 +2304,7 @@ function getOfflineReply(raw, err) {
     return `${base}\nSetup quick path:\n1. cd web\n2. npm install\n3. cp .env.example .env\n4. OPENROUTER_API_KEY ya selected provider key bharo\n5. npm run dev\n6. http://localhost:4321 open karo`;
   }
 
-  return `${base}\nIsko fully live AI banana hai to backend ko Firebase Functions/Cloud Run/VPS par deploy karke frontend ko us API URL se connect karna padega. Local testing ke liye: cd web && npm run dev.`;
+  return `${base}\nAgar live site par ho to thoda refresh karo; agar local ho to: cd web && npm run dev.`;
 }
 
 async function xSend() {
@@ -2333,8 +2330,6 @@ async function xSend() {
 
   try {
     const apiUrl = getChatApiUrl();
-    if (!apiUrl) throw new Error('Backend is not deployed for this static hosting page');
-
     const res = await fetch(apiUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
