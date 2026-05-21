@@ -3,28 +3,74 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+.ipynb_checkpoints/
 
-# Environment
+# Environment / Secrets
 .env
+.env.*
+!.env.example
+*.env
+web/.env
+
+# Virtual Environments
 .venv/
 venv/
+env/
+ENV/
 
-# IDE
+# IDE & Editor files
 .vscode/
 .idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
 
-# OS
+# OS Files
 .DS_Store
+Thumbs.db
+ehthumbs.db
 
 # Logs
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Database / local memory (IMPORTANT for your project)
+# Project Memory & Private Databases
+# (Crucial: prevents users from uploading private conversation memory)
 memory/memory.db
 memory/*.db
+memory/*.json
+memory/*.index
+memory/.migrated
 
-# Temporary files
+# Node.js
+node_modules/
+web/node_modules/
+
+# Firebase
+.firebase/
+web/.firebase/
+
+# Temporary / Cache
 *.tmp
-
-# Cache
 .cache/
+
+# Model Cache (HuggingFace, SentenceTransformers)
+.cache/huggingface/
+models/
+*.bin
+*.safetensors
+*.onnx
+
+# Screenshots (temporary vision files)
+*.png
+*.jpg
+*.jpeg
+screenshot_*.png
+
+# FAISS Index
+*.index
+*.faiss

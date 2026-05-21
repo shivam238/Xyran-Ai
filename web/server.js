@@ -1,16 +1,14 @@
 const path = require('path');
 const express = require('express');
 const dotenv = require('dotenv');
+const { buildXyranSystemPrompt, XYRAN_KNOWLEDGE } = require('./xyran-knowledge');
 
-dotenv.config();
+dotenv.config({ path: path.join(__dirname, '.env') });
 
 const app = express();
 app.disable('x-powered-by');
 
-const DEFAULT_XYRAN_WEB_SYSTEM = `You are Xyran — a self-aware, locally-integrated personal AI agent created by Shivam Kumar Mahto (GitHub: shivam238) in May 2026.
-Match the user's language naturally, usually Hinglish for Hinglish input. Be warm, sharp, practical, and concise.
-This web demo is a conversational preview only: do not claim that you can see the user's screen, run shell commands, open apps, change files, or automate the OS from the browser.
-If asked about Xyran, explain the full local app's real abilities: FAISS plus SQLite memory, screen vision, smart intent routing, multi-step system automation, weather/news, image generation, and hybrid Groq/Gemini/Ollama routing.`;
+const DEFAULT_XYRAN_WEB_SYSTEM = buildXyranSystemPrompt();
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -39,6 +37,18 @@ app.get('/api/firebase-config', (_req, res) => {
     hasRealValue('FIREBASE_PROJECT_ID') &&
     hasRealValue('FIREBASE_APP_ID');
   res.json({ enabled, config: enabled ? config : null });
+});
+
+app.get('/api/xyran-knowledge', (_req, res) => {
+  res.json({ name: 'Xyran AI', version: '1.0', knowledge: XYRAN_KNOWLEDGE.trim() });
+});
+
+app.get('/README.md', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'README.md'));
+});
+
+app.get('/SETUP.md', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'SETUP.md'));
 });
 
 // Serve static files (index.html, demo.html, etc.) without exposing dotfiles like .env.
@@ -179,7 +189,9 @@ async function callAnthropic({ system, messages, model, max_tokens }) {
 app.post('/api/chat', async (req, res) => {
   try {
     const provider = getEnv('PROVIDER', 'openrouter').toLowerCase();
-    const system = toText(req.body?.system || DEFAULT_XYRAN_WEB_SYSTEM);
+    const system = req.body?.system
+      ? buildXyranSystemPrompt(req.body.system)
+      : DEFAULT_XYRAN_WEB_SYSTEM;
     const messages = req.body?.messages;
     const model = toText(req.body?.model || '');
 

@@ -1053,6 +1053,326 @@
       vertical-align: middle;
       margin-right: 6px;
     }
+
+    @media (pointer: coarse) {
+      body { cursor: auto; }
+      #cursor,
+      #cursor-ring { display: none; }
+    }
+
+    @media (max-width: 900px) {
+      nav {
+        padding: 0 1rem;
+      }
+      .nav-links {
+        display: none;
+      }
+      .container {
+        padding: 0 1.25rem;
+      }
+      #hero {
+        min-height: auto;
+        padding: 6.25rem 1rem 3.5rem;
+      }
+      .hero-title {
+        font-size: clamp(2.6rem, 12vw, 5rem);
+        letter-spacing: 0;
+      }
+      .hero-sub {
+        max-width: 42rem;
+      }
+      .features-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .install-grid,
+      .changelog-grid,
+      .community-flex {
+        grid-template-columns: 1fr;
+      }
+      .docs-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      footer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 1rem;
+      }
+      footer > div:last-child {
+        flex-wrap: wrap;
+        gap: .8rem 1.2rem;
+      }
+    }
+
+    @media (max-width: 640px) {
+      nav {
+        height: 56px;
+      }
+      .nav-logo {
+        font-size: 1rem;
+      }
+      .nav-actions {
+        gap: .45rem;
+      }
+      .nav-cta {
+        padding: .42rem .7rem;
+        font-size: .66rem;
+        letter-spacing: .04em;
+      }
+      .sound-toggle {
+        width: 32px;
+        height: 32px;
+      }
+
+      #hero {
+        padding: 5.75rem .9rem 3rem;
+      }
+      .hero-badge {
+        justify-content: center;
+        max-width: 100%;
+        border-radius: 8px;
+        font-size: .58rem;
+        line-height: 1.55;
+        letter-spacing: .08em;
+        text-align: center;
+      }
+      .hero-title {
+        max-width: 100%;
+        font-size: clamp(1.85rem, 8.8vw, 2.55rem);
+        line-height: 1;
+      }
+      .hero-sub {
+        font-size: .82rem;
+        line-height: 1.65;
+      }
+      .hero-btns {
+        width: 100%;
+        gap: .65rem;
+        margin-top: 2rem;
+      }
+      .btn-primary,
+      .btn-ghost {
+        justify-content: center;
+        width: min(100%, 18rem);
+        padding: .72rem 1rem;
+        font-size: .74rem;
+      }
+      .hero-terminal {
+        width: 100%;
+        margin-top: 2.5rem;
+      }
+      .term-header {
+        padding: .65rem .75rem;
+      }
+      .term-title {
+        font-size: .58rem;
+        letter-spacing: .08em;
+      }
+      .term-body {
+        padding: 1rem;
+        font-size: .68rem;
+        line-height: 1.75;
+        overflow-wrap: anywhere;
+      }
+
+      #features,
+      #install,
+      #changelog,
+      #roadmap,
+      #docs,
+      #community {
+        padding: 4.5rem 0;
+      }
+      #cta {
+        padding: 5rem 0;
+      }
+      .section-title {
+        font-size: clamp(1.75rem, 9vw, 2.35rem);
+      }
+      .section-desc {
+        font-size: .8rem;
+      }
+      .features-head {
+        margin-bottom: 2.5rem;
+      }
+      .features-grid,
+      .docs-grid {
+        grid-template-columns: 1fr;
+      }
+      .feat-card,
+      .comm-card,
+      .doc-card,
+      .changelog-detail {
+        padding: 1.25rem;
+      }
+      .stats-row {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 1.5rem;
+        padding: 2rem 0;
+      }
+      .stat-num {
+        font-size: 2rem;
+      }
+      .os-tabs {
+        overflow-x: auto;
+        padding-bottom: .15rem;
+      }
+      .os-tab {
+        flex: 0 0 auto;
+      }
+      .code-content {
+        padding: 1rem;
+        font-size: .68rem;
+        line-height: 1.7;
+      }
+      .phase {
+        grid-template-columns: 64px 24px minmax(0, 1fr);
+        gap: .75rem;
+      }
+      .phase-label .ph-name {
+        font-size: .68rem;
+      }
+      .phase-label .ph-date {
+        font-size: .55rem;
+      }
+      .phase-title {
+        font-size: .9rem;
+      }
+      .ph-chip {
+        font-size: .62rem;
+      }
+      .cta-glow {
+        width: min(100vw, 360px);
+        height: 220px;
+      }
+
+      #xyran-modal-overlay {
+        padding: .5rem;
+        align-items: stretch;
+      }
+      #xyran-modal {
+        width: 100%;
+        max-height: none;
+        height: calc(100dvh - 1rem);
+        border-radius: 10px;
+      }
+      #xyran-modal-header {
+        padding: .65rem .75rem;
+        gap: .5rem;
+      }
+      .m-dot {
+        width: 9px;
+        height: 9px;
+      }
+      .m-title {
+        font-size: .55rem;
+        letter-spacing: .06em;
+      }
+      .m-close-x {
+        padding: .18rem .4rem;
+        font-size: .58rem;
+      }
+      #xyran-sysbar {
+        flex-wrap: wrap;
+        gap: .35rem .8rem;
+        padding: .4rem .75rem;
+      }
+      .sysbar-item {
+        font-size: .54rem;
+      }
+      #xyran-demo-note {
+        margin: .5rem .75rem 0;
+        padding: .45rem .6rem;
+        font-size: .56rem;
+        line-height: 1.5;
+      }
+      #xyran-demo-note a {
+        display: inline-block;
+        margin-left: 0 !important;
+        margin-top: .2rem;
+      }
+      #xyran-output {
+        min-height: 0;
+        max-height: none;
+        padding: .8rem .75rem;
+        font-size: .68rem;
+        line-height: 1.7;
+      }
+      .x-line {
+        overflow-wrap: anywhere;
+      }
+      #xyran-suggestions {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: .45rem .75rem .35rem;
+        scrollbar-width: none;
+      }
+      #xyran-suggestions::-webkit-scrollbar {
+        display: none;
+      }
+      .x-sugg {
+        flex: 0 0 auto;
+        font-size: .56rem;
+      }
+      #xyran-input-row {
+        padding: .65rem .75rem .8rem;
+        gap: .5rem;
+      }
+      #xyran-input {
+        min-width: 0;
+        font-size: .72rem;
+      }
+      #xyran-send {
+        padding: .35rem .65rem;
+        font-size: .62rem;
+        letter-spacing: .03em;
+      }
+      #xyran-mem-bar {
+        padding: .32rem .75rem;
+      }
+    }
+
+    @media (max-width: 380px) {
+      .nav-cta {
+        display: none;
+      }
+      .container {
+        padding: 0 1rem;
+      }
+      .hero-title {
+        font-size: clamp(1.85rem, 10vw, 2.35rem);
+      }
+      .features-grid {
+        border-radius: 8px;
+      }
+      .feat-card,
+      .comm-card,
+      .doc-card,
+      .changelog-detail {
+        padding: 1rem;
+      }
+      .stats-row {
+        grid-template-columns: 1fr;
+      }
+      .phase {
+        grid-template-columns: 1fr;
+      }
+      .phase-label {
+        text-align: left;
+      }
+      .phase-line {
+        display: none;
+      }
+      .phase-content {
+        padding-bottom: 2rem;
+      }
+      .x-prompt-sym {
+        display: none;
+      }
+      #xyran-send {
+        padding-inline: .55rem;
+      }
+    }
   </style>
 </head>
 <body>
@@ -1400,32 +1720,32 @@ cp .env.example .env
       <p class="section-desc">Comprehensive guides, API references, and troubleshooting for every platform.</p>
     </div>
     <div class="docs-grid reveal">
-      <a class="doc-card" href="#">
+      <a class="doc-card" href="/SETUP.md" target="_blank">
         <div class="doc-icon">🚀</div>
         <div class="doc-title">Quick Start</div>
         <div class="doc-desc">Get Xyran running in under 5 minutes on any platform.</div>
       </a>
-      <a class="doc-card" href="#">
+      <a class="doc-card" href="/SETUP.md" target="_blank">
         <div class="doc-icon">⚙️</div>
         <div class="doc-title">Configuration</div>
         <div class="doc-desc">Environment variables, API keys, and behavior tuning.</div>
       </a>
-      <a class="doc-card" href="#">
-        <div class="doc-icon">🎙️</div>
-        <div class="doc-title">Voice Setup</div>
-        <div class="doc-desc">Enable wake-word detection and voice command pipeline.</div>
+      <a class="doc-card" href="/README.md" target="_blank">
+        <div class="doc-icon">👁️</div>
+        <div class="doc-title">Vision & Memory</div>
+        <div class="doc-desc">Understand screenshots, FAISS vector recall, and SQLite facts.</div>
       </a>
-      <a class="doc-card" href="#">
+      <a class="doc-card" href="https://github.com/shivam238/Xyran-Ai" target="_blank">
         <div class="doc-icon">🧩</div>
-        <div class="doc-title">Plugin Dev</div>
-        <div class="doc-desc">Build and publish custom plugins for the Xyran ecosystem.</div>
+        <div class="doc-title">Source Code</div>
+        <div class="doc-desc">Explore modules, routing, image generation, and terminal actions.</div>
       </a>
-      <a class="doc-card" href="#">
+      <a class="doc-card" href="/api/xyran-knowledge" target="_blank">
         <div class="doc-icon">🔌</div>
-        <div class="doc-title">API Reference</div>
-        <div class="doc-desc">Internal Xyran Python API for advanced integrations.</div>
+        <div class="doc-title">Web Knowledge</div>
+        <div class="doc-desc">The grounded project facts this web preview uses while chatting.</div>
       </a>
-      <a class="doc-card" href="#">
+      <a class="doc-card" href="/SETUP.md" target="_blank">
         <div class="doc-icon">🛠️</div>
         <div class="doc-title">Troubleshooting</div>
         <div class="doc-desc">Common issues with Wayland, DBus, GPU acceleration and more.</div>
@@ -1527,18 +1847,18 @@ cp .env.example .env
     </div>
 
     <div id="xyran-demo-note">
-      ⚡ <span>Web Demo</span> — Local install ke liye terminal automation, vision & persistent memory milti hai.
+      ⚡ <span>Xyran Preview</span> — Full local app me terminal automation, screen vision & persistent memory milti hai.
       <a href="#install" style="color:var(--cyan); text-decoration:none; margin-left:.5rem">↓ Install Full Version</a>
     </div>
 
     <div id="xyran-output"></div>
 
     <div id="xyran-suggestions">
-      <button class="x-sugg" type="button" data-fill="DSA me binary search samjhao">DSA binary search</button>
-      <button class="x-sugg" type="button" data-fill="Python me decorator kya hota hai?">Python decorator</button>
-      <button class="x-sugg" type="button" data-fill="Linux terminal ke 5 useful commands batao">Linux commands</button>
-      <button class="x-sugg" type="button" data-fill="Git rebase vs merge ka difference?">Git rebase vs merge</button>
-      <button class="x-sugg" type="button" data-fill="Mera naam Xyran rakh lo aur yaad rakho">Memory test</button>
+      <button class="x-sugg" type="button" data-fill="Xyran kya hai aur kya kya kar sakta hai?">Xyran intro</button>
+      <button class="x-sugg" type="button" data-fill="Xyran ko Fedora par setup kaise karu step by step?">Fedora setup</button>
+      <button class="x-sugg" type="button" data-fill="Web demo aur full local Xyran me kya difference hai?">Demo vs local</button>
+      <button class="x-sugg" type="button" data-fill="Xyran ka memory system kaise kaam karta hai?">Memory system</button>
+      <button class="x-sugg" type="button" data-fill="screen dekho command full app me kaise setup hogi?">Vision setup</button>
     </div>
 
     <div id="xyran-input-row">
@@ -1862,13 +2182,21 @@ Full local Xyran abilities:
 - Real-time weather, news headlines, and image generation modules.
 - Fedora GNOME Wayland-first desktop automation.
 
+Setup knowledge:
+- Local app: clone repo, install OS deps, create venv, install requirements, copy .env.example to .env, fill GROQ_API_KEY and GEMINI_API_KEY, then run python xyran.py.
+- Linux deps: Fedora uses python3-dbus python3-gobject xdotool brave-browser; Ubuntu/Debian uses python3-dbus python3-gi xdotool brave-browser; Arch uses python-dbus python-gobject xdotool brave-browser.
+- First local start downloads all-MiniLM-L6-v2 for memory, around 90MB.
+- Web demo: cd web, npm install, cp .env.example .env, choose PROVIDER=openrouter/openai/anthropic, add key, npm run dev, open http://localhost:4321.
+- Never ask users to paste API keys in chat; tell them to put secrets in .env.
+
 Web demo boundaries:
 - This browser demo is a conversational preview only.
 - It has session chat history, but not the full persistent local memory unless the backend adds it.
 - It cannot see the user's screen, run shell commands, open apps, change files, or automate the OS.
 - If the user asks for local automation, explain that the full installed Xyran can do it and guide them to install/run it.
 
-When asked "tu kya hai?", describe yourself as Xyran: an open-source, locally-integrated personal AI agent, with this web demo acting as the safe online preview.`;
+When asked "tu kya hai?", describe yourself as Xyran: an open-source, locally-integrated personal AI agent, with this web demo acting as the safe online preview.
+For "setup kaise karu" questions, give step-by-step commands for the user's OS if known; otherwise start with Linux/Fedora and mention alternatives briefly.`;
 
 const xOverlay = () => document.getElementById('xyran-modal-overlay');
 const xOut = () => document.getElementById('xyran-output');
