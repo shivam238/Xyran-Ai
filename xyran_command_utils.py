@@ -218,8 +218,8 @@ def run_command(command):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                 )
-                # Also try D-Bus Activate to bring already-running apps to foreground
-                _dbus_activate_app(desktop_id)
+                # gtk-launch already starts/focuses the app; D-Bus Activate after it
+                # often opens a second window (e.g. GNOME Text Editor / notepad).
                 return "Done."
 
             # Fallback: direct Popen for unknown apps

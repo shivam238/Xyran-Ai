@@ -527,6 +527,8 @@ def resolve_app_alias(requested_app):
 
 def is_screenshot_request(user_input):
     lowered = user_input.lower()
+    if re.search(r"\bss\s+(?:le|lo|lena|lelo)\b", lowered):
+        return True
     screenshot_words = ["screenshot", "screen shot", "ss le", "ss lo", "capture screen"]
     return any(word in lowered for word in screenshot_words)
 

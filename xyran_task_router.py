@@ -15,7 +15,7 @@ ACTION_MAP = {
     "type":       ["likh", "write", "type", "likho", "likhna", "likho"],
     "screenshot": ["screenshot", "capture", "snip", "snap", "ss"],
     "search":     ["search", "dhundh", "khoj", "google"],
-    "show":       ["dikha", "dikhao", "show", "display", "open"],
+    "show":       ["dikha", "dikhao", "show", "display"],
     "delete":     ["delete", "hatao", "mita", "remove"],
     "read":       ["padh", "read", "dekh"],
     "save":       ["save", "rakh", "store"],
@@ -161,6 +161,12 @@ def route_intent(text, prev_action_category=None):
         or get_local_smalltalk_reply(lowered)
     ):
         return "DIRECT_HANDLER"
+
+    # Simple notepad/editor open — offline-safe, never needs LLM planner
+    from xyran_input_utils import is_text_editor_request
+    if is_text_editor_request(lowered):
+        if not has_gui_pipeline_pattern(text) and not has_action_connectors(text):
+            return "DIRECT_HANDLER"
 
     if is_compound_task(text):
         return "LLM_PLANNER"

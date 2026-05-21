@@ -30,7 +30,8 @@ from xyran_input_utils import (
     should_use_vision,
 )
 from xyran_ai import XyranAI, clean_json
-from xyran_direct_actions import handle_direct_action
+from xyran_direct_actions import handle_direct_action, try_builtin_compound_pipeline
+from xyran_network import has_internet
 from xyran_news import NewsManager
 from xyran_prompts import build_system_prompt, build_vision_system_prompt
 from xyran_response import process_response
@@ -164,7 +165,28 @@ Ollama fallback: {ollama_status}
                 prev_action_category=runtime_state.last_action_category if runtime_state else None,
             )
 
-            # Multi-step compound tasks need LLM run_multi planner — skip partial direct execution
+            if route == "LLM_PLANNER":
+                if try_builtin_compound_pipeline(
+                    user_input, runtime_state, run_command, command_failed, ai
+                ):
+                    runtime_state.last_input_used_vision = False
+                    continue
+                # Mis-routed or partial compound: try direct handler before giving up
+                if handle_direct_action(
+                    user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai
+                ):
+                    runtime_state.last_input_used_vision = False
+                    continue
+                if not has_internet():
+                    print(
+                        "[Xyran] Offline: ye multi-step task abhi local plan se match nahi hua.\n"
+                        "[Xyran] Bina net ke chalte hain: notepad/editor kholo, joke, mausam, "
+                        "screenshot, files, calculator, browser (agar installed ho).\n"
+                        "[Xyran] Compound try karo: `yt khol ke ss le` | `browser khol ke ss le` | "
+                        "`editor kholo aur ss le` | `chrome khol ke screenshot le`"
+                    )
+                    continue
+
             if route != "LLM_PLANNER":
                 if handle_direct_action(
                     user_input, runtime_state, news_manager, pyjokes, run_command, command_failed, ai
@@ -172,7 +194,7 @@ Ollama fallback: {ollama_status}
                     runtime_state.last_input_used_vision = False
                     continue
 
-            # route == "LLM_PLANNER" or "LLM_FALLBACK" (after direct miss) — cloud and/or Ollama
+            # LLM_PLANNER (unknown compound) or LLM_FALLBACK — cloud and/or Ollama
 
             use_vision = should_use_vision(user_input)
 

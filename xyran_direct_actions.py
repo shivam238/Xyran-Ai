@@ -184,14 +184,151 @@ def should_write_last_answer(user_input, extracted_text, runtime_state):
     return len(overlap) >= 2
 
 
+def _run_screenshot_step(step_index, step_total, runtime_state, run_command, lowered, wait_seconds=1.0):
+    time.sleep(wait_seconds)
+    print(f"[Step {step_index}/{step_total}] Screenshot le raha hoon...")
+    temp_path, err = take_screenshot()
+    if not temp_path:
+        print(f"[Xyran] Screenshot nahi le paya: {err}")
+        return False
+
+    saved_path = save_screenshot_copy(temp_path, AI_NAME)
+    os.remove(temp_path)
+    runtime_state.last_screenshot_path = saved_path
+
+    if wants_to_show_screenshot(lowered):
+        print(f"[CMD] xdg-open \"{saved_path}\" &")
+        output = run_command(f'xdg-open "{saved_path}" &')
+        if output and output != "Done.":
+            print(f"[Output] {output}")
+        print(f"[Xyran] Screenshot save ho gaya aur khol diya: {saved_path}")
+    else:
+        print(f"[Xyran] Screenshot save ho gaya: {saved_path}")
+    return True
+
+
+def try_builtin_compound_pipeline(user_input, runtime_state, run_command, command_failed, ai=None):
+    """
+    Offline-safe multi-step flows (Step 1/2...) without LLM.
+    Returns True when the request was fully handled locally.
+    """
+    from xyran_task_router import is_compound_task
+
+    lowered = user_input.lower().strip()
+    if not is_compound_task(user_input) or not is_screenshot_request(lowered):
+        return False
+
+    search_query = extract_web_search_query(user_input)
+    known_website = resolve_known_website(user_input)
+    open_wait = 2.5
+
+    if is_open_youtube_request(lowered):
+        print("[Xyran] Local multi-step plan: YouTube → screenshot")
+        print("[Step 1/2] YouTube khol raha hoon...")
+        message, runtime_state.last_browser_action = smart_open_youtube(
+            user_input,
+            run_command,
+            runtime_state.last_browser_action,
+        )
+        print(f"[Xyran] {message}")
+        if _run_screenshot_step(2, 2, runtime_state, run_command, lowered, wait_seconds=open_wait):
+            print("[Xyran] Ho gaya.")
+            return True
+        return True
+
+    if is_browser_open_request(lowered) and not search_query:
+        print("[Xyran] Local multi-step plan: Browser → screenshot")
+        print("[Step 1/2] Browser khol raha hoon...")
+        message = smart_open_browser(user_input, run_command)
+        print(f"[Xyran] {message}")
+        if _run_screenshot_step(2, 2, runtime_state, run_command, lowered, wait_seconds=open_wait):
+            print("[Xyran] Ho gaya.")
+            return True
+        return True
+
+    if known_website and not is_open_youtube_request(lowered):
+        print(f"[Xyran] Local multi-step plan: {known_website['website']} → screenshot")
+        print("[Step 1/2] Website khol raha hoon...")
+        message = smart_open_website(known_website["website"], user_input, run_command)
+        print(f"[Xyran] {message}")
+        if _run_screenshot_step(2, 2, runtime_state, run_command, lowered, wait_seconds=open_wait):
+            print("[Xyran] Ho gaya.")
+            return True
+        return True
+
+    if search_query and search_consumes_open_phrase(user_input):
+        print("[Xyran] Local multi-step plan: Search → screenshot")
+        print("[Step 1/2] Browser search kar raha hoon...")
+        message = smart_search_web(search_query, user_input, run_command)
+        print(f"[Xyran] {message}")
+        if _run_screenshot_step(2, 2, runtime_state, run_command, lowered, wait_seconds=open_wait):
+            print("[Xyran] Ho gaya.")
+            return True
+        return True
+
+    if is_text_editor_request(lowered):
+        editor = get_available_text_editor()
+        if not editor:
+            return False
+        text_to_write = extract_text_to_write(user_input) or generate_code_from_topic(user_input)
+        total = 3 if text_to_write else 2
+        print(f"[Xyran] Local multi-step plan: Editor → screenshot")
+        file_path = prepare_editor_file(runtime_state, text_to_write)
+        editor_cmd = editor
+        if editor in ("gnome-text-editor", "gedit"):
+            editor_cmd = f"{editor} --new-window"
+        print(f"[Step 1/{total}] {editor} khol raha hoon...")
+        output = run_command(f'{editor_cmd} "{file_path}" &')
+        if output and output != "Done." and command_failed(output):
+            print("[Xyran] Editor khul nahi paya.")
+            return True
+        if text_to_write:
+            print(f"[Step 2/{total}] File mein text likh diya: {file_path}")
+            time.sleep(1.2)
+        _run_screenshot_step(total, total, runtime_state, run_command, lowered, wait_seconds=1.0)
+        print("[Xyran] Ho gaya.")
+        return True
+
+    if is_app_launch_request(lowered) and not is_ambiguous_open_request(lowered):
+        app_result = resolve_app_launch(user_input, run_command, command_failed)
+        if not app_result:
+            return False
+        print(f"[Xyran] Local multi-step plan: {app_result['label']} → screenshot")
+        print(f"[Step 1/2] {app_result['label']} khol raha hoon...")
+        print(f"[CMD] {app_result['command']}")
+        output = run_command(app_result["command"])
+        if output and output != "Done.":
+            print(f"[Output] {output}")
+        if command_failed(output):
+            print("[Xyran] App launch fail ho gaya.")
+            return True
+        print(f"[Xyran] {app_result['message']}")
+        if _run_screenshot_step(2, 2, runtime_state, run_command, lowered, wait_seconds=open_wait):
+            print("[Xyran] Ho gaya.")
+            return True
+        return True
+
+    return False
+
+
 def handle_direct_action(user_input, runtime_state, news_manager, pyjokes_module, run_command, command_failed, ai=None):
     lowered = user_input.lower().strip()
     did_something = False
 
-    # Compound multi-step commands are handled by LLM planner (run_multi), not here
+    # Compound tasks: try built-in offline pipeline first (caller may also invoke this)
     from xyran_task_router import is_compound_task
     if is_compound_task(user_input):
-        return False
+        if try_builtin_compound_pipeline(
+            user_input, runtime_state, run_command, command_failed, ai
+        ):
+            return True
+        # Misclassified compound (e.g. "open notepad") — fall through to simple handlers
+        if not (
+            is_text_editor_request(lowered)
+            and not is_screenshot_request(lowered)
+            and not has_action_connector(lowered)
+        ):
+            return False
 
     # FLAGS FIRST (IMPORTANT)
     screenshot_requested = is_screenshot_request(lowered)
